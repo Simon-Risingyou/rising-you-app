@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rising You — Admin portaal</title>
+<style>
+  :root{
+    --groen:#1e8a4c; --groen-licht:#e3f5ea;
+    --rood:#cc2b2b; --rood-licht:#fbe7e7;
+    --geel:#e6a700; --geel-licht:#fdf3d6;
+    --blauw:#1f6fb2; --blauw-licht:#e6f0f9;
+    --paars:#5a4ab7; --paars-licht:#ece9fb;
+    --oranje:#d2691e; --oranje-licht:#fbeede;
+    --grijs:#5f5e5a; --lijn:#dcdad2; --bg:#f4f2ec; --wit:#fff; --tekst:#2c2c2a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--tekst);font-size:16px;line-height:1.45}
+  .balk{background:var(--wit);border-bottom:2px solid var(--lijn);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .logo{font-size:22px;font-weight:700;color:var(--blauw)}
+  .logo span{color:var(--groen)}
+  .tabs{display:flex;gap:8px}
+  .tab{font-size:15px;padding:8px 16px;border:2px solid var(--lijn);border-radius:10px;background:var(--wit);cursor:pointer;text-decoration:none;color:var(--tekst);font-weight:600}
+  .tab.actief{background:var(--paars);color:#fff;border-color:var(--paars)}
+  .medewerker{display:flex;align-items:center;gap:10px;font-size:15px}
+  .sym{font-size:1.15em;line-height:1}
+  .wrap{max-width:1100px;margin:0 auto;padding:18px}
+  .subtabs{display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap}
+  .subtab{font-size:15px;padding:10px 18px;border:2px solid var(--lijn);border-radius:11px;background:var(--wit);cursor:pointer;font-weight:600;display:flex;align-items:center;gap:7px}
+  .subtab.actief{background:var(--paars-licht);border-color:var(--paars);color:var(--paars)}
+  .paneel{display:none}
+  .paneel.actief{display:block}
+  .kaart{background:var(--wit);border:2px solid var(--lijn);border-radius:16px;padding:20px;margin-bottom:16px}
+  .kaart h2{font-size:19px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .knop{font-size:15px;font-weight:600;padding:11px 15px;border:none;border-radius:11px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;justify-content:center}
+  .knop-paars{background:var(--paars);color:#fff}
+  .knop-groen{background:var(--groen);color:#fff}
+  .knop-grijs{background:#eceae3;color:var(--tekst)}
+  .knop-rood-omlijnd{background:var(--wit);color:var(--rood);border:2px solid var(--rood)}
+  .knop-groot{width:100%}
+  .mini-knop{font-size:13px;padding:7px 11px;border-radius:9px;border:2px solid var(--lijn);background:var(--wit);cursor:pointer;font-weight:600}
+  .mini-knop.groen{color:var(--groen)} .mini-knop.groen:hover{background:var(--groen-licht);border-color:var(--groen)}
+  .mini-knop.rood{color:var(--rood)} .mini-knop.rood:hover{background:var(--rood-licht);border-color:var(--rood)}
+  .mini-knop.blauw{color:var(--blauw)} .mini-knop.blauw:hover{background:var(--blauw-licht);border-color:var(--blauw)}
+  .leeg{color:var(--grijs);text-align:center;padding:24px;font-size:15px}
+
+  /* Sessiebeheer */
+  .sessie-kaart{border:2px solid var(--lijn);border-radius:14px;padding:16px;margin-bottom:12px}
+  .sessie-kop{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+  .sessie-naam{font-size:18px;font-weight:700;flex:1}
+  .act-tag{font-size:13px;font-weight:600;color:var(--paars);background:var(--paars-licht);padding:3px 10px;border-radius:999px}
+  .moment-rij{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid var(--lijn);border-radius:10px;margin-bottom:6px;background:#faf9f5}
+  .moment-dag{font-weight:600;min-width:90px}
+  .moment-tijd{color:var(--grijs);flex:1}
+  .veld{margin-bottom:12px}
+  .veld label{display:block;font-size:14px;font-weight:600;margin-bottom:4px}
+  .veld input,.veld select{width:100%;font-size:15px;padding:10px;border:2px solid var(--lijn);border-radius:10px}
+  .veld-rij{display:flex;gap:10px;flex-wrap:wrap}
+  .veld-rij .veld{flex:1;min-width:120px}
+  .nieuw-moment{display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-top:10px;padding-top:12px;border-top:1px dashed var(--lijn)}
+  .nieuw-moment .veld{margin-bottom:0;flex:1;min-width:100px}
+
+  /* Wijzigingen */
+  .schakel{display:flex;gap:6px;margin-bottom:14px}
+  .schakel button{font-size:14px;padding:8px 14px;border:2px solid var(--lijn);border-radius:9px;background:var(--wit);cursor:pointer;font-weight:600;color:var(--grijs)}
+  .schakel button.aan{border-color:var(--paars);background:var(--paars-licht);color:var(--paars)}
+  .groep{border:2px solid var(--lijn);border-radius:12px;margin-bottom:10px;overflow:hidden}
+  .groep-kop{background:#faf9f5;padding:10px 14px;font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--lijn)}
+  .groep-kop .telt{font-size:13px;color:var(--grijs);font-weight:400;margin-left:auto}
+  .wijz-rij{display:flex;gap:10px;padding:9px 14px;font-size:14px;border-bottom:1px solid #f0eee7;align-items:baseline}
+  .wijz-rij:last-child{border-bottom:none}
+  .wijz-tijd{font-size:12px;color:var(--grijs);min-width:90px;font-variant-numeric:tabular-nums}
+  .wijz-tekst{flex:1}
+  .wijz-wie{font-size:12px;color:var(--grijs)}
+  .wijz-type{font-size:11px;padding:2px 8px;border-radius:999px;background:var(--blauw-licht);color:var(--blauw);font-weight:600}
+
+  /* Nieuwe accounts */
+  .acc-kaart{border:2px solid var(--oranje);border-radius:14px;padding:14px;margin-bottom:10px;background:var(--oranje-licht)}
+  .acc-kop{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+  .acc-naam{font-size:17px;font-weight:700;flex:1}
+  .acc-detail{font-size:14px;color:var(--grijs);margin-bottom:10px}
+  .acc-acties{display:flex;gap:8px;flex-wrap:wrap}
+
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:16px;z-index:50}
+  .overlay.open{display:flex}
+  .modal{background:var(--wit);border-radius:18px;width:100%;max-width:440px;padding:22px;max-height:92vh;overflow:auto}
+  .modal h3{font-size:20px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--tekst);color:#fff;padding:13px 20px;border-radius:12px;font-size:15px;display:none;align-items:center;gap:10px;z-index:80;max-width:90vw}
+  .toast.open{display:flex}
+</style>
+</head>
+<body>
+<div class="balk">
+  <div class="logo">Rising <span>You</span> — Admin portaal</div>
+  <div class="tabs">
+    <a class="tab" href="checkin.html" id="tab-checkin">&#128247; Check-in</a>
+    <a class="tab" href="ledenbeheer.html" id="tab-ledenbeheer">&#128100; Ledenbeheer</a>
+    <a class="tab actief" href="admin-portaal.html">&#128273; Admin portaal</a>
+  </div>
+  <div class="medewerker"><span class="sym">&#128273;</span><span>Admin: <b id="admin-naam">Lana</b></span>
+    <button class="knop knop-rood-omlijnd" style="font-size:14px;padding:8px 12px" onclick="adminUitloggen()"><span class="sym">&#128274;</span> Uitloggen</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="subtabs">
+    <button class="subtab actief" id="st-sessies" onclick="toonPaneel('sessies')"><span class="sym">&#128197;</span> Sessies inplannen</button>
+    <button class="subtab" id="st-wijzigingen" onclick="toonPaneel('wijzigingen')"><span class="sym">&#9851;&#65039;</span> Recente wijzigingen</button>
+    <button class="subtab" id="st-accounts" onclick="toonPaneel('accounts')"><span class="sym">&#10133;</span> Nieuwe accounts <span id="acc-teller" style="background:var(--rood);color:#fff;border-radius:999px;padding:1px 8px;font-size:12px;margin-left:4px"></span></button>
+    <button class="subtab" disabled style="opacity:.5;cursor:not-allowed"><span class="sym">&#128202;</span> Statistieken (later)</button>
+  </div>
+
+  <!-- PANEEL: SESSIES -->
+  <div class="paneel actief" id="paneel-sessies">
+    <div class="kaart">
+      <h2><span class="sym">&#128197;</span> Sessies inplannen</h2>
+      <p style="font-size:14px;color:var(--grijs);margin-bottom:14px">Een sessie kan meerdere momenten hebben (bv. Yoga op dinsdag 18u en zondag 10u). Voeg per sessie momenten toe.</p>
+      <div id="sessie-lijst"></div>
+      <button class="knop knop-paars knop-groot" style="margin-top:8px" onclick="openNieuweSessie()"><span class="sym">&#10133;</span> Nieuwe sessie</button>
+    </div>
+  </div>
+
+  <!-- PANEEL: WIJZIGINGEN -->
+  <div class="paneel" id="paneel-wijzigingen">
+    <div class="kaart">
+      <h2><span class="sym">&#9851;&#65039;</span> Recente wijzigingen</h2>
+      <div class="schakel">
+        <button id="grp-lid" class="aan" onclick="zetGroep('lid')">Per lid</button>
+        <button id="grp-medewerker" onclick="zetGroep('medewerker')">Per medewerker</button>
+      </div>
+      <div id="wijz-lijst"></div>
+    </div>
+  </div>
+
+  <!-- PANEEL: ACCOUNTS -->
+  <div class="paneel" id="paneel-accounts">
+    <div class="kaart">
+      <h2><span class="sym">&#10133;</span> Nieuwe accounts &#8212; goedkeuren</h2>
+      <p style="font-size:14px;color:var(--grijs);margin-bottom:14px">Nieuwe profielen wachten op goedkeuring. Keur goed, wijs af, of bewerk eerst.</p>
+      <div id="acc-lijst"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: sessie aanmaken/bewerken -->
+<div class="overlay" id="overlay-sessie">
+  <div class="modal">
+    <h3><span class="sym">&#128197;</span> <span id="sessie-modal-titel">Nieuwe sessie</span></h3>
+    <div class="veld"><label>Naam van de sessie</label><input id="ms-naam" placeholder="bv. Yoga"></div>
+    <div class="veld"><label>Activiteit</label>
+      <select id="ms-activiteit"></select>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="knop knop-grijs" style="flex:1" onclick="sluitSessieModal()">Annuleer</button>
+      <button class="knop knop-groen" style="flex:1" onclick="bewaarSessie()"><span class="sym">&#10003;</span> Bewaren</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: account bewerken -->
+<div class="overlay" id="overlay-acc">
+  <div class="modal">
+    <h3><span class="sym">&#9999;&#65039;</span> Account bewerken</h3>
+    <div class="veld-rij">
+      <div class="veld"><label>Voornaam</label><input id="ma-voornaam"></div>
+      <div class="veld"><label>Achternaam</label><input id="ma-achternaam"></div>
+    </div>
+    <div class="veld-rij">
+      <div class="veld"><label>Geboortejaar</label><input id="ma-jaar" type="number"></div>
+      <div class="veld"><label>Postcode</label><input id="ma-postcode"></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="knop knop-grijs" style="flex:1" onclick="sluitAccModal()">Annuleer</button>
+      <button class="knop knop-groen" style="flex:1" onclick="bewaarAccount()"><span class="sym">&#10003;</span> Bewaren + goedkeuren</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// Toegangscontrole: het admin portaal is enkel voor ingelogde admins.
+// Wie hier zonder admin-status belandt, wordt teruggestuurd naar de check-in.
+(function(){
+  let ingelogd=false;
+  try{ ingelogd = sessionStorage.getItem('ry_admin')==='1'; }catch(e){}
+  if(!ingelogd){ window.location.href='index.html'; }
+})();
+const ACTIVITEITEN=[{code:"klimmen",naam:"Klimmen"},{code:"yoga",naam:"Yoga"},{code:"workout",naam:"We Workout"}];
+const DAGEN=["zondag","maandag","dinsdag","woensdag","donderdag","vrijdag","zaterdag"];
+
+// --- Voorbeelddata ---
+let sessies=[
+  {id:"s1", naam:"Klimclub", activiteit:"klimmen", momenten:[
+    {dag:2, start:"18:00", eind:"21:00"}, {dag:4, start:"18:00", eind:"21:00"}]},
+  {id:"s2", naam:"Yoga", activiteit:"yoga", momenten:[
+    {dag:2, start:"19:00", eind:"20:00"}, {dag:0, start:"10:00", eind:"11:00"}]},
+  {id:"s3", naam:"We Workout", activiteit:"workout", momenten:[
+    {dag:1, start:"17:30", eind:"18:30"}, {dag:5, start:"17:30", eind:"18:30"}]},
+];
+
+// Recente wijzigingen (zou uit handelingen_log komen)
+let wijzigingen=[
+  {tijd:"09:12", lid:"Guy Janssens", medewerker:"Sara", type:"postcode", tekst:"Postcode gewijzigd naar 2018"},
+  {tijd:"09:14", lid:"Guy Janssens", medewerker:"Sara", type:"beurten", tekst:"10 klimbeurten bijgekocht"},
+  {tijd:"09:40", lid:"Anna Petrova", medewerker:"Mehmet", type:"abonnement", tekst:"Abonnement klimmen 6 maanden toegevoegd"},
+  {tijd:"10:05", lid:"Omar Haddad", medewerker:"Sara", type:"foto", tekst:"Profielfoto toegevoegd"},
+  {tijd:"10:22", lid:"Guy Janssens", medewerker:"Joke", type:"tarieftype", tekst:"Tarieftype op volwassene gezet"},
+  {tijd:"11:01", lid:"Lin Chen", medewerker:"Mehmet", type:"beurten", tekst:"5 yogabeurten bijgekocht"},
+];
+
+// Nieuwe accounts (zouden status 'nieuw' hebben)
+let nieuweAccounts=[
+  {id:"n1", voornaam:"Yusuf", achternaam:"Demir", jaar:1998, postcode:"2060", herkomst:"Turkije", bron:"zelfregistratie", tijd:"vandaag 08:30"},
+  {id:"n2", voornaam:"Maria", achternaam:"Santos", jaar:2010, postcode:"2140", herkomst:"Portugal", bron:"kassa", tijd:"vandaag 09:50"},
+];
+
+let sessieBewerkId=null, accBewerkId=null, groepModus='lid';
+
+function toon(t){const el=document.getElementById('toast');el.innerHTML=t;el.classList.add('open');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('open'),2600);}
+function activiteitNaam(c){const a=ACTIVITEITEN.find(x=>x.code===c);return a?a.naam:c;}
+
+function toonPaneel(naam){
+  ['sessies','wijzigingen','accounts'].forEach(p=>{
+    document.getElementById('paneel-'+p).classList.toggle('actief',p===naam);
+    document.getElementById('st-'+p).classList.toggle('actief',p===naam);
+  });
+}
+
+// ============ SESSIES ============
+function tekenSessies(){
+  const box=document.getElementById('sessie-lijst');
+  box.innerHTML='';
+  if(sessies.length===0){box.innerHTML='<div class="leeg">Nog geen sessies. Maak er een aan.</div>';return;}
+  sessies.forEach(s=>{
+    const div=document.createElement('div');div.className='sessie-kaart';
+    let momentenHtml='';
+    s.momenten.forEach((m,mi)=>{
+      momentenHtml+='<div class="moment-rij">'
+        +'<span class="moment-dag">'+DAGEN[m.dag].charAt(0).toUpperCase()+DAGEN[m.dag].slice(1)+'</span>'
+        +'<span class="moment-tijd">'+m.start+(m.eind?' &#8211; '+m.eind:'')+'</span>'
+        +'<button class="mini-knop rood" onclick="verwijderMoment(\''+s.id+'\','+mi+')">&#10005;</button></div>';
+    });
+    if(s.momenten.length===0) momentenHtml='<div style="font-size:14px;color:var(--grijs);padding:6px 0">Nog geen momenten.</div>';
+    div.innerHTML=
+      '<div class="sessie-kop"><span class="sessie-naam">'+s.naam+'</span>'
+      +'<span class="act-tag">'+activiteitNaam(s.activiteit)+'</span>'
+      +'<button class="mini-knop blauw" onclick="bewerkSessie(\''+s.id+'\')">&#9999;&#65039; Naam</button>'
+      +'<button class="mini-knop rood" onclick="verwijderSessie(\''+s.id+'\')">&#128465;&#65039;</button></div>'
+      +momentenHtml
+      +'<div class="nieuw-moment">'
+      +'<div class="veld"><label>Dag</label><select id="nm-dag-'+s.id+'">'+DAGEN.map((d,i)=>'<option value="'+i+'">'+d.charAt(0).toUpperCase()+d.slice(1)+'</option>').join('')+'</select></div>'
+      +'<div class="veld"><label>Start</label><input type="time" id="nm-start-'+s.id+'" value="18:00"></div>'
+      +'<div class="veld"><label>Einde</label><input type="time" id="nm-eind-'+s.id+'" value="19:00"></div>'
+      +'<button class="knop knop-grijs" onclick="voegMomentToe(\''+s.id+'\')"><span class="sym">&#10133;</span> Moment</button></div>';
+    box.appendChild(div);
+  });
+}
+function voegMomentToe(sid){
+  const s=sessies.find(x=>x.id===sid);if(!s)return;
+  const dag=parseInt(document.getElementById('nm-dag-'+sid).value);
+  const start=document.getElementById('nm-start-'+sid).value;
+  const eind=document.getElementById('nm-eind-'+sid).value;
+  if(!start){toon('&#9888;&#65039; Kies een starttijd');return;}
+  s.momenten.push({dag,start,eind});
+  s.momenten.sort((a,b)=>a.dag-b.dag||a.start.localeCompare(b.start));
+  tekenSessies();
+  toon('&#9989; Moment toegevoegd aan '+s.naam);
+}
+function verwijderMoment(sid,mi){
+  const s=sessies.find(x=>x.id===sid);if(!s)return;
+  s.momenten.splice(mi,1);tekenSessies();
+  toon('&#10005; Moment verwijderd');
+}
+function openNieuweSessie(){
+  sessieBewerkId=null;
+  document.getElementById('sessie-modal-titel').textContent='Nieuwe sessie';
+  document.getElementById('ms-naam').value='';
+  const sel=document.getElementById('ms-activiteit');
+  sel.innerHTML=ACTIVITEITEN.map(a=>'<option value="'+a.code+'">'+a.naam+'</option>').join('');
+  document.getElementById('overlay-sessie').classList.add('open');
+}
+function bewerkSessie(sid){
+  const s=sessies.find(x=>x.id===sid);if(!s)return;
+  sessieBewerkId=sid;
+  document.getElementById('sessie-modal-titel').textContent='Sessie bewerken';
+  document.getElementById('ms-naam').value=s.naam;
+  const sel=document.getElementById('ms-activiteit');
+  sel.innerHTML=ACTIVITEITEN.map(a=>'<option value="'+a.code+'"'+(a.code===s.activiteit?' selected':'')+'>'+a.naam+'</option>').join('');
+  document.getElementById('overlay-sessie').classList.add('open');
+}
+function sluitSessieModal(){document.getElementById('overlay-sessie').classList.remove('open');}
+function bewaarSessie(){
+  const naam=document.getElementById('ms-naam').value.trim();
+  const act=document.getElementById('ms-activiteit').value;
+  if(!naam){toon('&#9888;&#65039; Geef een naam');return;}
+  if(sessieBewerkId){
+    const s=sessies.find(x=>x.id===sessieBewerkId);s.naam=naam;s.activiteit=act;
+    toon('&#9989; Sessie aangepast');
+  } else {
+    sessies.push({id:'s'+Date.now(),naam,activiteit:act,momenten:[]});
+    toon('&#9989; Sessie "'+naam+'" aangemaakt');
+  }
+  sluitSessieModal();tekenSessies();
+}
+function verwijderSessie(sid){
+  const s=sessies.find(x=>x.id===sid);if(!s)return;
+  if(!confirm('Sessie "'+s.naam+'" en al haar momenten verwijderen?'))return;
+  sessies=sessies.filter(x=>x.id!==sid);tekenSessies();
+  toon('&#128465;&#65039; Sessie verwijderd');
+}
+
+// ============ WIJZIGINGEN ============
+function zetGroep(modus){
+  groepModus=modus;
+  document.getElementById('grp-lid').classList.toggle('aan',modus==='lid');
+  document.getElementById('grp-medewerker').classList.toggle('aan',modus==='medewerker');
+  tekenWijzigingen();
+}
+function tekenWijzigingen(){
+  const box=document.getElementById('wijz-lijst');
+  box.innerHTML='';
+  if(wijzigingen.length===0){box.innerHTML='<div class="leeg">Nog geen wijzigingen.</div>';return;}
+  const sleutel=groepModus==='lid'?'lid':'medewerker';
+  const groepen={};
+  wijzigingen.forEach(w=>{(groepen[w[sleutel]]=groepen[w[sleutel]]||[]).push(w);});
+  Object.keys(groepen).sort().forEach(naam=>{
+    const g=document.createElement('div');g.className='groep';
+    let rijen='';
+    groepen[naam].forEach(w=>{
+      const extra=groepModus==='lid'?('door '+w.medewerker):('bij '+w.lid);
+      rijen+='<div class="wijz-rij"><span class="wijz-tijd">'+w.tijd+'</span>'
+        +'<span class="wijz-tekst">'+w.tekst+' <span class="wijz-wie">('+extra+')</span></span>'
+        +'<span class="wijz-type">'+w.type+'</span></div>';
+    });
+    g.innerHTML='<div class="groep-kop"><span class="sym">'+(groepModus==='lid'?'&#128100;':'&#128104;&#8205;&#128188;')+'</span> '+naam+'<span class="telt">'+groepen[naam].length+' wijziging(en)</span></div>'+rijen;
+    box.appendChild(g);
+  });
+}
+
+// ============ NIEUWE ACCOUNTS ============
+function tekenAccounts(){
+  const box=document.getElementById('acc-lijst');
+  const teller=document.getElementById('acc-teller');
+  teller.textContent=nieuweAccounts.length||'';
+  teller.style.display=nieuweAccounts.length?'inline':'none';
+  box.innerHTML='';
+  if(nieuweAccounts.length===0){box.innerHTML='<div class="leeg">Geen nieuwe accounts om goed te keuren. &#127881;</div>';return;}
+  nieuweAccounts.forEach(a=>{
+    const div=document.createElement('div');div.className='acc-kaart';
+    div.innerHTML=
+      '<div class="acc-kop"><span class="sym">&#128100;</span><span class="acc-naam">'+a.voornaam+' '+a.achternaam+'</span>'
+      +'<span style="font-size:12px;color:var(--grijs)">'+a.tijd+' &#183; '+a.bron+'</span></div>'
+      +'<div class="acc-detail">Geboortejaar '+(a.jaar||'?')+' &#183; postcode '+(a.postcode||'?')+' &#183; '+(a.herkomst||'?')+'</div>'
+      +'<div class="acc-acties">'
+      +'<button class="mini-knop groen" onclick="keurGoed(\''+a.id+'\')">&#10003; Goedkeuren</button>'
+      +'<button class="mini-knop blauw" onclick="bewerkAccount(\''+a.id+'\')">&#9999;&#65039; Bewerken</button>'
+      +'<button class="mini-knop rood" onclick="wijsAf(\''+a.id+'\')">&#10005; Afwijzen</button></div>';
+    box.appendChild(div);
+  });
+}
+function keurGoed(id){
+  const a=nieuweAccounts.find(x=>x.id===id);if(!a)return;
+  nieuweAccounts=nieuweAccounts.filter(x=>x.id!==id);
+  tekenAccounts();
+  toon('&#9989; '+a.voornaam+' goedgekeurd');
+}
+function wijsAf(id){
+  const a=nieuweAccounts.find(x=>x.id===id);if(!a)return;
+  if(!confirm('Account van '+a.voornaam+' '+a.achternaam+' afwijzen?'))return;
+  nieuweAccounts=nieuweAccounts.filter(x=>x.id!==id);
+  tekenAccounts();
+  toon('&#10005; '+a.voornaam+' afgewezen');
+}
+function bewerkAccount(id){
+  const a=nieuweAccounts.find(x=>x.id===id);if(!a)return;
+  accBewerkId=id;
+  document.getElementById('ma-voornaam').value=a.voornaam;
+  document.getElementById('ma-achternaam').value=a.achternaam;
+  document.getElementById('ma-jaar').value=a.jaar||'';
+  document.getElementById('ma-postcode').value=a.postcode||'';
+  document.getElementById('overlay-acc').classList.add('open');
+}
+function sluitAccModal(){document.getElementById('overlay-acc').classList.remove('open');}
+function bewaarAccount(){
+  const a=nieuweAccounts.find(x=>x.id===accBewerkId);if(!a)return;
+  a.voornaam=document.getElementById('ma-voornaam').value.trim();
+  a.achternaam=document.getElementById('ma-achternaam').value.trim();
+  a.jaar=document.getElementById('ma-jaar').value;
+  a.postcode=document.getElementById('ma-postcode').value.trim();
+  sluitAccModal();
+  // bewaren + meteen goedkeuren
+  nieuweAccounts=nieuweAccounts.filter(x=>x.id!==accBewerkId);
+  tekenAccounts();
+  toon('&#9989; '+a.voornaam+' bewerkt en goedgekeurd');
+}
+
+function adminUitloggen(){
+  // Vergrendel admin opnieuw: status wissen zodat de portaal-tab overal verdwijnt.
+  try{ sessionStorage.removeItem('ry_admin'); }catch(e){}
+  toon('&#128274; Admin uitgelogd');
+  setTimeout(()=>{ window.location.href='index.html'; }, 600);
+}
+
+tekenSessies();
+tekenWijzigingen();
+tekenAccounts();
+</script>
+</body>
+</html>

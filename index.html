@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rising You — Check-in</title>
+<style>
+  :root{
+    --groen:#1e8a4c; --groen-licht:#e3f5ea;
+    --rood:#cc2b2b; --rood-licht:#fbe7e7;
+    --geel:#e6a700; --geel-licht:#fdf3d6;
+    --blauw:#1f6fb2; --blauw-licht:#e6f0f9;
+    --paars:#5a4ab7; --paars-licht:#ece9fb;
+    --oranje:#d2691e; --oranje-licht:#fbeede;
+    --grijs:#5f5e5a; --lijn:#dcdad2; --bg:#f4f2ec; --wit:#fff; --tekst:#2c2c2a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--tekst);font-size:17px;line-height:1.4}
+  .balk{background:var(--wit);border-bottom:2px solid var(--lijn);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .logo{font-size:22px;font-weight:700;color:var(--blauw)}
+  .tabs{display:flex;gap:8px}
+  .tab{font-size:15px;padding:8px 16px;border:2px solid var(--lijn);border-radius:10px;background:var(--wit);cursor:pointer;text-decoration:none;color:var(--tekst);font-weight:600}
+  .tab.actief{background:var(--blauw);color:#fff;border-color:var(--blauw)}
+  .tab.admin-tab{border-color:var(--paars);color:var(--paars)}
+  .tab.admin-tab:hover{background:var(--paars-licht)}
+  .leen-knop{font-size:15px;padding:12px;border:2px solid var(--lijn);border-radius:11px;background:var(--wit);cursor:pointer;text-align:left}
+  .leen-knop:hover{border-color:var(--blauw);background:var(--blauw-licht)}
+  .leen-knop.voorkeur{border-color:var(--groen);background:var(--groen-licht)}
+  .leen-tag{font-size:11px;background:var(--groen);color:#fff;padding:2px 7px;border-radius:999px;margin-left:6px}
+  .gezinrij.hoofd{background:#fff;border:1px solid var(--paars)}
+  .gezincheck.vast{cursor:default}
+  .logo span{color:var(--groen)}
+  .medewerker{display:flex;align-items:center;gap:10px;font-size:16px}
+  .medewerker select{font-size:16px;padding:8px 12px;border:2px solid var(--lijn);border-radius:10px;background:var(--wit)}
+  .sym{font-size:1.15em;line-height:1}
+  .layout{display:grid;grid-template-columns:300px 1fr 1fr;gap:16px;padding:16px;max-width:1500px;margin:0 auto}
+  @media(max-width:1100px){.layout{grid-template-columns:1fr}}
+  .kaart{background:var(--wit);border:2px solid var(--lijn);border-radius:16px;padding:18px}
+  .kaart h2{font-size:19px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .scan-input{font-size:19px;padding:13px;border:3px solid var(--blauw);border-radius:12px;width:100%;text-align:center}
+  .uitleg{font-size:15px;color:var(--grijs);text-align:center;margin:10px 0}
+  .knop{font-size:17px;font-weight:600;padding:13px 16px;border:none;border-radius:12px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;justify-content:center}
+  .knop-grijs{background:#eceae3;color:var(--tekst)}
+  .knop-groen{background:var(--groen);color:#fff}
+  .knop-groot{width:100%}
+  .blok{margin-top:16px;padding-top:16px;border-top:2px solid var(--lijn)}
+  .zoek-input{font-size:16px;padding:11px;border:2px solid var(--lijn);border-radius:10px;width:100%}
+  .zoek-resultaten{margin-top:10px;display:flex;flex-direction:column;gap:8px;max-height:280px;overflow:auto}
+  .zoekrij{border:2px solid var(--lijn);border-radius:10px;padding:10px;display:flex;align-items:center;gap:10px}
+  .zoekrij .nm{font-weight:600;flex:1}
+  .zoekrij .st{font-size:13px;color:var(--grijs)}
+  .demo-rij{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+  .demo-rij button{font-size:13px;padding:7px 10px;border:2px solid var(--lijn);background:var(--wit);border-radius:9px;cursor:pointer}
+  .wachtlijst{display:flex;flex-direction:column;gap:11px;min-height:60px}
+  .leeg{color:var(--grijs);text-align:center;padding:22px;font-size:15px}
+  .wachtkaart{border:2px solid var(--lijn);border-radius:14px;padding:12px;display:flex;gap:11px;align-items:flex-start;background:var(--wit);position:relative}
+  .wachtkaart.groen{border-left:8px solid var(--groen);background:var(--groen-licht)}
+  .wachtkaart.rood{border-left:8px solid var(--rood);background:var(--rood-licht)}
+  .wachtkaart.oranje{border-left:8px solid var(--oranje);background:var(--oranje-licht)}
+  .wachtkaart.paars{border-left:8px solid var(--paars);background:var(--paars-licht)}
+  .wachtkaart.info{border-left:8px solid var(--blauw);background:var(--blauw-licht)}
+  .wachtkaart[draggable=true]{cursor:grab}
+  .fotomini{width:50px;height:50px;border-radius:10px;background:#eceae3;display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--grijs);flex-shrink:0;overflow:hidden}
+  .wk-info{flex:1;min-width:0}
+  .wk-info .naam{font-size:18px;font-weight:700}
+  .wk-status{font-size:14px;margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;font-size:13px;font-weight:600}
+  .b-groen{background:#cdeed9;color:var(--groen)}
+  .b-rood{background:#f6d4d4;color:var(--rood)}
+  .b-blauw{background:#d4e6f6;color:var(--blauw)}
+  .b-oranje{background:#f6e2cc;color:#9c4e0f}
+  .b-paars{background:#ddd7f5;color:var(--paars)}
+  .checks{display:flex;gap:7px;margin-top:8px;flex-wrap:wrap}
+  .check{font-size:13px;padding:5px 10px;border-radius:999px;border:2px solid var(--lijn);background:var(--wit);cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-weight:600;color:var(--grijs)}
+  .check.aan{background:#cdeed9;border-color:var(--groen);color:var(--groen)}
+  .check.akaart.aan{background:var(--geel-licht);border-color:var(--geel);color:#7a5800}
+  .sleep-hint{font-size:12px;color:var(--grijs);margin-top:5px}
+  .gezinblok{margin-top:10px;padding:10px;border:2px dashed var(--paars);border-radius:11px;background:var(--paars-licht)}
+  .gezinkop{font-size:13px;font-weight:700;color:var(--paars);margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  .gezinrij{display:flex;align-items:center;gap:8px;padding:6px 4px;border-radius:8px}
+  .gezinrij.aan{background:#fff}
+  .gezincheck{cursor:pointer;font-size:18px;width:24px;text-align:center;flex-shrink:0}
+  .gezinnaam{flex:1;font-size:15px}
+  .betaalkeuze{display:flex;gap:4px;flex-shrink:0}
+  .betaalkeuze .bkn{font-size:12px;padding:5px 9px;border:2px solid var(--lijn);border-radius:8px;background:#fff;cursor:pointer;font-weight:600;color:var(--grijs)}
+  .betaalkeuze .bkn.aan{border-color:var(--groen);background:var(--groen-licht);color:var(--groen)}
+  .betaalkeuze .bkn:disabled{opacity:.4;cursor:not-allowed}
+  .tegoed-rij{display:flex;gap:5px;flex-wrap:wrap;margin:6px 0}
+  .tegoed-badge{font-size:12px;padding:3px 8px;border-radius:999px;font-weight:600}
+  .tegoed-badge.abo{background:var(--groen-licht);color:var(--groen)}
+  .tegoed-badge.beurt{background:#d4e6f6;color:var(--blauw)}
+  .tegoed-badge.geen{background:#eceae3;color:var(--grijs)}
+  .betaalwijze-rij{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:8px 0}
+  .betaalwijze-rij .bw-naam{font-size:13px;color:var(--grijs);font-weight:600}
+  .bwn{font-size:12px;padding:6px 10px;border:2px solid var(--lijn);border-radius:9px;background:#fff;cursor:pointer;font-weight:600;color:var(--grijs)}
+  .bwn.aan{border-color:var(--groen);background:var(--groen-licht);color:var(--groen)}
+  .gezinsub{padding:6px 8px 8px 30px;background:#fff;border-radius:8px;margin:0 0 6px 0}
+  .act-tag{display:inline-block;font-size:12px;font-weight:600;color:var(--paars);background:var(--paars-licht);padding:2px 9px;border-radius:999px;margin-bottom:8px}
+  .sleep-hint.klaar{color:var(--groen);font-weight:600}
+  .annuleer{position:absolute;top:8px;right:8px;width:30px;height:30px;border-radius:8px;border:2px solid var(--lijn);background:var(--wit);color:var(--rood);cursor:pointer;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .annuleer:hover{background:var(--rood-licht);border-color:var(--rood)}
+  .infoknop{position:absolute;top:8px;right:46px;width:30px;height:30px;border-radius:8px;border:2px solid var(--lijn);background:var(--wit);color:var(--blauw);cursor:pointer;font-size:16px;font-weight:700;display:flex;align-items:center;justify-content:center}
+  .infoknop:hover{background:var(--blauw-licht);border-color:var(--blauw)}
+  .profiel-rij{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--lijn);font-size:16px}
+  .profiel-rij:last-child{border-bottom:none}
+  .profiel-rij .pl{color:var(--grijs)}
+  .profiel-rij .pv{font-weight:600;text-align:right}
+  .profiel-foto{width:80px;height:80px;border-radius:14px;background:#eceae3;display:flex;align-items:center;justify-content:center;font-size:36px;color:var(--grijs);margin:0 auto 14px}
+  .land-knop{width:100%;font-size:16px;padding:10px;border:2px solid var(--lijn);border-radius:10px;background:var(--wit);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left}
+  .land-knop:hover{border-color:var(--blauw)}
+  .land-knop.gekozen{border-color:var(--groen);background:var(--groen-licht)}
+  .landrij{display:flex;align-items:center;gap:12px;padding:12px 14px;border:2px solid var(--lijn);border-radius:12px;cursor:pointer;font-size:17px}
+  .landrij:hover{background:var(--blauw-licht);border-color:var(--blauw)}
+  .landrij .vlag{font-size:26px;line-height:1;width:34px;text-align:center}
+  .land-kop{font-size:13px;font-weight:700;color:var(--grijs);text-transform:uppercase;letter-spacing:.04em;margin:6px 2px 2px}
+  .sessies{margin-top:16px;display:grid;grid-template-columns:1fr 1fr;gap:11px}
+  .sessie{border:3px dashed var(--lijn);border-radius:14px;padding:13px;min-height:110px;transition:.15s}
+  .sessie h3{font-size:15px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+  .sessie.los{border-color:var(--blauw)}
+  .sessie.club{border-color:var(--paars)}
+  .sessie.over{background:var(--blauw-licht);border-style:solid}
+  .sessie.club.over{background:var(--paars-licht)}
+  .toegewezen{font-size:14px;padding:7px 10px;border-radius:10px;margin-top:6px;display:flex;align-items:center;gap:6px}
+  .sessie.los .toegewezen{background:var(--blauw-licht);color:var(--blauw)}
+  .sessie.club .toegewezen{background:var(--paars-licht);color:var(--paars)}
+  .dag-tabel{display:flex;flex-direction:column;gap:8px;max-height:560px;overflow:auto}
+  .dagrij{border:2px solid var(--lijn);border-radius:11px;padding:10px 12px;display:flex;align-items:center;gap:10px;font-size:15px}
+  .dagrij.geannuleerd{opacity:.5;text-decoration:line-through}
+  .dagrij .tijd{font-size:13px;color:var(--grijs);font-variant-numeric:tabular-nums}
+  .dagrij .dnaam{font-weight:600;flex:1}
+  .dagrij .dwie{font-size:13px;color:var(--grijs)}
+  .mini-knop{font-size:13px;padding:6px 10px;border-radius:8px;border:2px solid var(--lijn);background:var(--wit);cursor:pointer;font-weight:600}
+  .mini-knop.blauw{color:var(--blauw)}
+  .mini-knop.blauw:hover{background:var(--blauw-licht);border-color:var(--blauw)}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
+  .overlay.open{display:flex}
+  .modal{background:var(--wit);border-radius:18px;width:100%;max-width:460px;padding:22px;max-height:90vh;overflow:auto}
+  .modal h3{font-size:20px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .veld{margin-bottom:12px}
+  .veld label{display:block;font-size:14px;font-weight:600;margin-bottom:4px}
+  .veld input,.veld select{width:100%;font-size:16px;padding:10px;border:2px solid var(--lijn);border-radius:10px}
+  .veld-rij{display:flex;gap:10px}
+  .veld-rij .veld{flex:1}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--tekst);color:#fff;padding:13px 20px;border-radius:12px;font-size:16px;display:none;align-items:center;gap:10px;z-index:80;max-width:90vw}
+  .toast.open{display:flex}
+</style>
+</head>
+<body>
+<div class="balk">
+  <div class="logo">Rising <span>You</span> — Check-in</div>
+  <div class="tabs">
+    <a class="tab actief" href="#" onclick="return false" id="tab-checkin">&#128247; Check-in</a>
+    <a class="tab" href="ledenbeheer.html" id="tab-ledenbeheer" onclick="window.location.href='ledenbeheer.html';return false">&#128100; Ledenbeheer</a>
+    <a class="tab admin-tab" id="admin-portaal-tab" href="#" onclick="window.location.href='admin-portaal.html';return false" style="display:none">&#128273; Admin portaal</a>
+  </div>
+  <div class="medewerker"><span class="sym">&#128100;</span><span>Wie werkt nu?</span>
+    <select id="medewerker" onchange="medewerkerGewijzigd()"><option>Sara</option><option>Mehmet</option><option>Joke</option><option>Lana (admin)</option></select>
+    <button class="knop knop-grijs" id="admin-knop" style="font-size:14px;padding:8px 12px" onclick="adminKnopActie()"><span class="sym">&#128274;</span> Admin login</button>
+  </div>
+</div>
+<div class="layout">
+  <div class="kaart">
+    <h2><span class="sym">&#128247;</span> Inchecken</h2>
+    <input class="scan-input" id="scaninput" placeholder="Scan kaartje&#8230;" autocomplete="off">
+    <div class="uitleg">Scan de QR-code.<br>Het lid komt meteen in de wachtkamer.</div>
+    <div class="demo-rij" id="demorij"></div>
+    <div class="blok">
+      <h2 style="font-size:16px"><span class="sym">&#128269;</span> Klant opzoeken</h2>
+      <div class="uitleg" style="text-align:left;margin:0 0 8px">Voor klanten zonder kaartje (bv. clubsessie).</div>
+      <input class="zoek-input" id="zoekinput" placeholder="Typ een naam&#8230;" oninput="zoek()">
+      <div class="zoek-resultaten" id="zoekresultaten"></div>
+    </div>
+    <div class="blok">
+      <button class="knop knop-grijs knop-groot" onclick="openNieuwProfiel()"><span class="sym">&#10133;</span> Nieuw profiel</button>
+    </div>
+  </div>
+  <div class="kaart">
+    <h2><span class="sym">&#9203;</span> Wachtkamer</h2>
+    <div class="wachtlijst" id="wachtlijst"><div class="leeg">Nog niemand in de wachtkamer.</div></div>
+    <div class="sessies" id="sessies"></div>
+  </div>
+  <div class="kaart">
+    <h2><span class="sym">&#128203;</span> Check-ins vandaag</h2>
+    <div class="dag-tabel" id="dagtabel"><div class="leeg">Nog geen check-ins vandaag.</div></div>
+  </div>
+</div>
+<div class="overlay" id="overlay-nieuw">
+  <div class="modal">
+    <h3><span class="sym">&#10133;</span> Nieuw profiel</h3>
+    <div class="veld-rij">
+      <div class="veld"><label>Voornaam</label><input id="np-voornaam"></div>
+      <div class="veld"><label>Achternaam</label><input id="np-achternaam"></div>
+    </div>
+    <div class="veld-rij">
+      <div class="veld"><label>Geboortejaar</label><input id="np-jaar" type="number" placeholder="bv. 1995"></div>
+      <div class="veld"><label>Postcode</label><input id="np-postcode" placeholder="bv. 2060"></div>
+    </div>
+    <div class="veld"><label>Land van herkomst</label>
+      <button type="button" class="land-knop" id="np-land-knop" onclick="openLandKiezer()"><span id="np-land-tekst">Kies een land&#8230;</span><span class="sym">&#9662;</span></button>
+      <input type="hidden" id="np-herkomst"><input type="hidden" id="np-herkomst-code">
+    </div>
+    <div class="veld"><label>Sociaal tarief?</label>
+      <select id="np-sociaal"><option value="nee">Nee</option><option value="ja">Ja &#8212; moet A-Kaart gebruiken</option></select>
+    </div>
+    <div style="display:flex;gap:10px;margin-top:8px">
+      <button class="knop knop-grijs" style="flex:1" onclick="sluitNieuw()">Annuleer</button>
+      <button class="knop knop-groen" style="flex:1" onclick="maakNieuwProfiel()"><span class="sym">&#10003;</span> Aanmaken + wachtkamer</button>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="overlay-land">
+  <div class="modal" style="max-width:440px">
+    <h3><span class="sym">&#127757;</span> Kies een land</h3>
+    <input class="zoek-input" id="land-zoek" placeholder="Typ een land&#8230;" oninput="tekenLanden()" style="margin-bottom:10px">
+    <div id="land-lijst" style="max-height:46vh;overflow:auto;display:flex;flex-direction:column;gap:6px"></div>
+    <button class="knop knop-grijs knop-groot" style="margin-top:14px" onclick="sluitLandKiezer()">Annuleer</button>
+  </div>
+</div>
+<div class="overlay" id="overlay-profiel">
+  <div class="modal" style="max-width:400px">
+    <h3><span class="sym">&#128100;</span> Gegevens</h3>
+    <div class="profiel-foto">&#128100;</div>
+    <div id="profiel-inhoud"></div>
+    <button class="knop knop-grijs knop-groot" style="margin-top:16px" onclick="sluitProfiel()">Sluiten</button>
+  </div>
+</div>
+<div class="overlay" id="overlay-admin">
+  <div class="modal" style="max-width:380px;background:var(--wit);border-radius:18px;padding:22px">
+    <h3 style="font-size:20px;margin-bottom:14px;display:flex;align-items:center;gap:8px"><span class="sym">&#128274;</span> Admin login</h3>
+    <p style="font-size:15px;color:var(--grijs);margin-bottom:14px" id="admin-uitleg"></p>
+    <div class="veld"><label>Wachtwoord</label>
+      <input type="password" id="admin-wachtwoord" placeholder="Wachtwoord&#8230;" onkeydown="if(event.key==='Enter')doeAdminLogin()">
+    </div>
+    <div id="admin-fout" style="display:none;color:var(--rood);font-size:14px;margin-bottom:10px"><span class="sym">&#9888;&#65039;</span> Wachtwoord klopt niet.</div>
+    <div style="display:flex;gap:10px">
+      <button class="knop knop-grijs" style="flex:1" onclick="sluitAdminLogin()">Annuleer</button>
+      <button class="knop knop-groen" style="flex:1" onclick="doeAdminLogin()"><span class="sym">&#128275;</span> Inloggen</button>
+    </div>
+  </div>
+</div>
+<div class="overlay" id="overlay-lenen">
+  <div class="modal" style="max-width:420px;background:var(--wit);border-radius:18px;padding:22px">
+    <h3 style="font-size:20px;margin-bottom:8px;display:flex;align-items:center;gap:8px"><span class="sym">&#129309;</span> Beurt lenen</h3>
+    <p style="font-size:15px;color:var(--grijs);margin-bottom:14px" id="leen-uitleg"></p>
+    <div id="leen-opties" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
+    <button class="knop knop-grijs" style="width:100%" onclick="leenAnnuleer()">Annuleer (niet lenen)</button>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+<script>
+// ===========================================================================
+// LANDEN VAN HERKOMST
+// 'veelvoorkomend' = korte lijst die bovenaan verschijnt. Later kan deze
+// automatisch gevuld worden op basis van de echte ledenlijst (meest gekozen).
+// 'alle' = volledige lijst, geopend via "Ander land". Opgeslagen wordt altijd
+// {naam, code} zodat statistiek consistent blijft, ongeacht spelling.
+// ===========================================================================
+const LANDEN = [
+  {naam:"Afghanistan", code:"AF", vlag:"\uD83C\uDDE6\uD83C\uDDEB", veel:true},
+  {naam:"Syri\u00eb", code:"SY", vlag:"\uD83C\uDDF8\uD83C\uDDFE", veel:true},
+  {naam:"Oekra\u00efne", code:"UA", vlag:"\uD83C\uDDFA\uD83C\uDDE6", veel:true},
+  {naam:"Soedan", code:"SD", vlag:"\uD83C\uDDF8\uD83C\uDDE9", veel:true},
+  {naam:"Eritrea", code:"ER", vlag:"\uD83C\uDDEA\uD83C\uDDF7", veel:true},
+  {naam:"Somali\u00eb", code:"SO", vlag:"\uD83C\uDDF8\uD83C\uDDF4", veel:true},
+  {naam:"Irak", code:"IQ", vlag:"\uD83C\uDDEE\uD83C\uDDF6", veel:true},
+  {naam:"Iran", code:"IR", vlag:"\uD83C\uDDEE\uD83C\uDDF7", veel:true},
+  {naam:"Marokko", code:"MA", vlag:"\uD83C\uDDF2\uD83C\uDDE6", veel:true},
+  {naam:"Turkije", code:"TR", vlag:"\uD83C\uDDF9\uD83C\uDDF7", veel:true},
+  {naam:"Venezuela", code:"VE", vlag:"\uD83C\uDDFB\uD83C\uDDEA", veel:true},
+  {naam:"China", code:"CN", vlag:"\uD83C\uDDE8\uD83C\uDDF3", veel:true},
+  {naam:"Algerije", code:"DZ", vlag:"\uD83C\uDDE9\uD83C\uDDFF"},
+  {naam:"Congo (DR)", code:"CD", vlag:"\uD83C\uDDE8\uD83C\uDDE9"},
+  {naam:"Egypte", code:"EG", vlag:"\uD83C\uDDEA\uD83C\uDDEC"},
+  {naam:"Ethiopi\u00eb", code:"ET", vlag:"\uD83C\uDDEA\uD83C\uDDF9"},
+  {naam:"Georgi\u00eb", code:"GE", vlag:"\uD83C\uDDEC\uD83C\uDDEA"},
+  {naam:"Guinee", code:"GN", vlag:"\uD83C\uDDEC\uD83C\uDDF3"},
+  {naam:"India", code:"IN", vlag:"\uD83C\uDDEE\uD83C\uDDF3"},
+  {naam:"Kameroen", code:"CM", vlag:"\uD83C\uDDE8\uD83C\uDDF2"},
+  {naam:"Nigeria", code:"NG", vlag:"\uD83C\uDDF3\uD83C\uDDEC"},
+  {naam:"Pakistan", code:"PK", vlag:"\uD83C\uDDF5\uD83C\uDDF0"},
+  {naam:"Palestina", code:"PS", vlag:"\uD83C\uDDF5\uD83C\uDDF8"},
+  {naam:"Rusland", code:"RU", vlag:"\uD83C\uDDF7\uD83C\uDDFA"},
+  {naam:"Tunesi\u00eb", code:"TN", vlag:"\uD83C\uDDF9\uD83C\uDDF3"},
+  {naam:"Belgi\u00eb", code:"BE", vlag:"\uD83C\uDDE7\uD83C\uDDEA"},
+  {naam:"Ander land", code:"XX", vlag:"\uD83C\uDF0D"},
+];
+let landGekozen=null;
+function openLandKiezer(){document.getElementById('land-zoek').value='';tekenLanden();document.getElementById('overlay-land').classList.add('open');setTimeout(()=>document.getElementById('land-zoek').focus(),50);}
+function sluitLandKiezer(){document.getElementById('overlay-land').classList.remove('open');}
+function tekenLanden(){
+  const q=document.getElementById('land-zoek').value.trim().toLowerCase();
+  const box=document.getElementById('land-lijst');
+  box.innerHTML='';
+  const maakRij=(l)=>{
+    const r=document.createElement('div');r.className='landrij';
+    r.innerHTML='<span class="vlag">'+l.vlag+'</span><span>'+l.naam+'</span>';
+    r.onclick=()=>kiesLand(l);
+    return r;
+  };
+  if(q){
+    const treffers=LANDEN.filter(l=>l.code!=='XX'&&l.naam.toLowerCase().includes(q));
+    if(treffers.length===0){box.innerHTML='<div class="uitleg" style="text-align:left">Geen land gevonden. Kies "Ander land" en vraag hulp.</div>';}
+    treffers.forEach(l=>box.appendChild(maakRij(l)));
+    box.appendChild(maakRij(LANDEN.find(l=>l.code==='XX')));
+    return;
+  }
+  const kop=document.createElement('div');kop.className='land-kop';kop.textContent='Vaak gekozen';box.appendChild(kop);
+  LANDEN.filter(l=>l.veel).forEach(l=>box.appendChild(maakRij(l)));
+  const kop2=document.createElement('div');kop2.className='land-kop';kop2.textContent='Andere landen';box.appendChild(kop2);
+  LANDEN.filter(l=>!l.veel).forEach(l=>box.appendChild(maakRij(l)));
+}
+function kiesLand(l){
+  landGekozen=l;
+  document.getElementById('np-land-tekst').innerHTML=l.vlag+' '+l.naam;
+  document.getElementById('np-land-knop').classList.add('gekozen');
+  document.getElementById('np-herkomst').value=l.naam;
+  document.getElementById('np-herkomst-code').value=l.code;
+  sluitLandKiezer();
+}
+
+const ACTIVITEITEN=[{code:"klimmen",naam:"Klimmen"},{code:"yoga",naam:"Yoga"},{code:"workout",naam:"We Workout"}];
+const leden = {
+  "RY-guy":   {id:"guy",   voornaam:"Guy",   achternaam:"Janssens",sociaal:false, nieuw:false, jaar:1985, postcode:"2018", herkomst:"Belgi\u00eb",  gezinId:"g1", gezinRol:"voogd", tariefHandmatig:null,
+    beurtenkaarten:[{activiteit:"klimmen",tarief:"volwassene",beurten:12}], abonnementen:[{activiteit:"yoga",tarief:"volwassene",tot:"2026-12-31"}]},
+  "RY-sam":   {id:"sam",   voornaam:"Sam",   achternaam:"Janssens",sociaal:false, nieuw:false, jaar:2014, postcode:"2018", herkomst:"Belgi\u00eb",  gezinId:"g1", gezinRol:"kind", tariefHandmatig:null,
+    beurtenkaarten:[{activiteit:"klimmen",tarief:"kind",beurten:3}], abonnementen:[]},
+  "RY-simon": {id:"simon", voornaam:"Simon", achternaam:"Janssens",sociaal:false, nieuw:false, jaar:2016, postcode:"2018", herkomst:"Belgi\u00eb",  gezinId:"g1", gezinRol:"kind", tariefHandmatig:null,
+    beurtenkaarten:[{activiteit:"klimmen",tarief:"kind",beurten:0}], abonnementen:[]},
+  "RY-anna":  {id:"anna",  voornaam:"Anna",  achternaam:"Petrova", sociaal:false, nieuw:false, jaar:1992, postcode:"2018", herkomst:"Oekra\u00efne", gezinId:null, gezinRol:null, tariefHandmatig:null,
+    beurtenkaarten:[{activiteit:"klimmen",tarief:"volwassene",beurten:5}], abonnementen:[]},
+  "RY-omar":  {id:"omar",  voornaam:"Omar",  achternaam:"Haddad",  sociaal:true,  nieuw:false, jaar:2001, postcode:"2060", herkomst:"Syri\u00eb",  gezinId:null, gezinRol:null, tariefHandmatig:null,
+    beurtenkaarten:[{activiteit:"klimmen",tarief:"student",beurten:1}], abonnementen:[]},
+  "RY-lin":   {id:"lin",   voornaam:"Lin",   achternaam:"Chen",    sociaal:false, nieuw:false, jaar:1988, postcode:"2000", herkomst:"China", gezinId:null, gezinRol:null, tariefHandmatig:null,
+    beurtenkaarten:[], abonnementen:[{activiteit:"klimmen",tarief:"volwassene",tot:"2026-12-31"}]},
+  "RY-diego": {id:"diego", voornaam:"Diego", achternaam:"Morales", sociaal:true,  nieuw:false, jaar:1995, postcode:"2140", herkomst:"Venezuela", gezinId:null, gezinRol:null, tariefHandmatig:null,
+    beurtenkaarten:[], abonnementen:[{activiteit:"klimmen",tarief:"volwassene",tot:"2026-12-31"}]},
+};
+const gezinnen={ "g1":{id:"g1",naam:"Gezin Janssens"} };
+// Clubsessies hebben een vaste activiteit (admin kiest die) en weekdagen waarop
+// ze actief zijn (0=zondag..6=zaterdag). De check-in toont enkel sessies van vandaag.
+const clubsessies=[
+  {id:"club-klim", naam:"Klimclub", activiteit:"klimmen", weekdagen:[2,4]},   // di + do
+  {id:"club-yoga", naam:"Yoga",     activiteit:"yoga",    weekdagen:[3]},      // wo
+  {id:"club-workout", naam:"We Workout", activiteit:"workout", weekdagen:[1,5]}, // ma + vr
+];
+function sessiesVandaag(){
+  const dag=new Date().getDay();
+  return clubsessies.filter(c=>c.weekdagen.includes(dag));
+}
+
+function tariefVan(l){
+  if(l.tariefHandmatig) return l.tariefHandmatig;
+  if(!l.jaar) return 'volwassene';
+  const leeftijd=new Date().getFullYear()-Number(l.jaar);
+  if(leeftijd<=13) return 'kind';
+  if(leeftijd<=25) return 'student';
+  return 'volwassene';
+}
+function activiteitNaam(code){const a=ACTIVITEITEN.find(x=>x.code===code);return a?a.naam:code;}
+function aboTotVoor(l,act){const a=(l.abonnementen||[]).filter(x=>x.activiteit===act && new Date(x.tot)>=new Date()).sort((p,q)=>new Date(q.tot)-new Date(p.tot))[0];return a?a.tot:null;}
+function beurtenVoor(l,act){return (l.beurtenkaarten||[]).filter(k=>k.activiteit===act).reduce((s,k)=>s+k.beurten,0);}
+function eersteBeurtkaart(l,act){return (l.beurtenkaarten||[]).find(k=>k.activiteit===act && k.beurten>0)||null;}
+const ledenById={}; Object.entries(leden).forEach(([k,l])=>{l.sleutel=k; ledenById[l.id]=l;});
+let wachtId=0, nieuwTeller=0;
+const wachtenden={}, dagcheckins=[];
+const demorij=document.getElementById('demorij');
+Object.values(leden).forEach(l=>{const b=document.createElement('button');b.textContent=l.voornaam;b.onclick=()=>{const vensterOpen=document.querySelector('.overlay.open')!==null;verwerkScanCode(l.sleutel,vensterOpen);};demorij.appendChild(b);});
+// ===========================================================================
+// GLOBALE SCAN-ONDERSCHEPPING
+// Een USB-handscanner 'typt' de code zeer snel + Enter. We luisteren op het
+// hele document: komt er een snelle burst die met 'RY-' begint, dan is het een
+// scan -> we verwerken ze rechtstreeks, ongeacht welk veld focus heeft of welk
+// venster openstaat. Typt een mens met de hand (trager), dan laten we alles
+// gewoon naar het actieve veld gaan.
+// ===========================================================================
+const SCAN_PREFIX='RY-';
+const SCAN_MAX_PAUZE=60;   // ms tussen toetsen: sneller = scanner
+let scanBuffer='', scanLaatste=0, scanBezig=false;
+
+document.addEventListener('keydown', function(e){
+  const nu=Date.now();
+  const pauze=nu-scanLaatste;
+  scanLaatste=nu;
+
+  // Te lange pauze -> nieuwe (mogelijke) burst begint opnieuw.
+  if(pauze>SCAN_MAX_PAUZE){ scanBuffer=''; scanBezig=false; }
+
+  if(e.key==='Enter'){
+    // Sluit de burst af enkel af als het op een geldige scan lijkt.
+    if(scanBezig && scanBuffer.startsWith(SCAN_PREFIX)){
+      e.preventDefault(); e.stopPropagation();
+      const code=scanBuffer; scanBuffer=''; scanBezig=false;
+      const actiefVeld = document.activeElement &&
+        (document.activeElement.tagName==='INPUT' || document.activeElement.tagName==='SELECT' ||
+         document.activeElement.tagName==='TEXTAREA') &&
+        document.activeElement.id!=='scaninput';
+      const vensterOpen = document.querySelector('.overlay.open')!==null;
+      verwerkScanCode(code, actiefVeld||vensterOpen);
+    } else {
+      scanBuffer=''; scanBezig=false;
+    }
+    return;
+  }
+
+  // Alleen 'gewone' tekens bufferen.
+  if(e.key.length===1){
+    scanBuffer+=e.key;
+    if(scanBuffer.length>=SCAN_PREFIX.length){
+      scanBezig = scanBuffer.startsWith(SCAN_PREFIX);
+    }
+    // Begint de buffer met 'RY-' en wordt er supersnel getypt, dan onderscheppen
+    // we de tekens zodat ze niet in het actieve veld terechtkomen.
+    if(scanBezig){
+      const actief=document.activeElement;
+      const isScanBalk = actief && actief.id==='scaninput';
+      if(!isScanBalk){ e.preventDefault(); e.stopPropagation(); }
+    }
+  }
+}, true);
+
+// Verwerkt een onderschepte scancode. toonMelding=true als bediende ergens
+// anders mee bezig was (venster open of in een veld aan het typen).
+function verwerkScanCode(code, toonMelding){
+  const lid=leden[code.trim()];
+  if(!lid){ toon('&#10060; Kaartje niet herkend. Vraag hulp aan een medewerker.'); return; }
+  piep();
+  if(toonMelding){ toonScanMelding(lid.voornaam+' '+lid.achternaam); }
+  checkInLid(lid,'check_in');
+}
+
+// Korte, opvallende melding bovenaan dat een scan herkend is.
+function toonScanMelding(naam){
+  let bar=document.getElementById('scan-melding');
+  if(!bar){
+    bar=document.createElement('div'); bar.id='scan-melding';
+    bar.style.cssText='position:fixed;top:0;left:0;right:0;background:#1e8a4c;color:#fff;'
+      +'padding:12px 20px;text-align:center;font-size:17px;font-weight:600;z-index:100;'
+      +'display:flex;align-items:center;justify-content:center;gap:10px';
+    document.body.appendChild(bar);
+  }
+  bar.innerHTML='<span style="font-size:1.2em">&#9989;</span> Scan herkend: '+naam+' staat in de wachtkamer';
+  bar.style.display='flex';
+  clearTimeout(bar._t);
+  bar._t=setTimeout(()=>{bar.style.display='none';}, 2600);
+}
+
+// De scan-balk zelf: gewoon Enter verwerkt de ingetypte/gescande code.
+document.getElementById('scaninput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();verwerkScan();}});
+function piep(){try{const c=new(window.AudioContext||window.webkitAudioContext)();const o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.15;o.start();setTimeout(()=>{o.stop();c.close();},120);}catch(e){}}
+function verwerkScan(){
+  const sleutel=document.getElementById('scaninput').value.trim();
+  document.getElementById('scaninput').value=''; document.getElementById('scaninput').focus();
+  const lid=leden[sleutel];
+  if(!lid){toon('&#10060; Kaartje niet herkend. Vraag hulp aan een medewerker.');return;}
+  piep(); checkInLid(lid,'check_in');
+}
+function checkInLid(lid,soort){
+  const id=++wachtId;
+  // Gezinsleden ophalen (andere leden in hetzelfde gezin) als optie bij check-in.
+  let gezinsleden=[];
+  if(soort==='check_in' && lid.gezinId){
+    gezinsleden=Object.values(leden).filter(x=>x.gezinId===lid.gezinId && x.id!==lid.id)
+      .map(x=>({lidId:x.id, naam:x.voornaam, rol:x.gezinRol, aangevinkt:false, betaalwijze:null}));
+    // betaalwijze: null (niet gekozen) | 'tegoed' (beurt/abo) | 'los' (losse beurt aan kassa)
+  }
+  const w={id,lidId:lid.id,naam:lid.voornaam+' '+lid.achternaam,sociaal:lid.sociaal,nieuw:lid.nieuw,
+    soort,
+    // hoofdpersoon betaalwijze: null tot gekozen. Bij info n.v.t.
+    betaalwijze: soort==='alleen_info'?null:null,
+    akaart:(lid.sociaal&&soort==='check_in')?false:null,
+    sessie:null,sessieAct:null,geannuleerd:false,tijd:nu(),wie:medewerker(),
+    gezinsleden, hoofdMee:true, afgetrokken:[]};
+  wachtenden[id]=w; dagcheckins.push(w);
+  tekenWachtkamer(); tekenDag();
+  if(soort==='alleen_info') toon('&#8505;&#65039; '+w.naam+' &#8212; alleen profiel, geen beurt');
+}
+
+// Bepaalt voor een lid + activiteit welke betaalwijze mogelijk is.
+function tegoedStatus(lidId,act){
+  const l=ledenById[lidId];
+  const aboTot=aboTotVoor(l,act);
+  const beurten=beurtenVoor(l,act);
+  return {abo:!!aboTot, aboTot, beurten, heeftTegoed:(!!aboTot||beurten>0)};
+}
+// Is een persoon klaar om te slepen? Bij info nooit. A-Kaart moet ok zijn.
+// De echte tegoed-check gebeurt bij het slepen (hangt af van de sessie-activiteit).
+function klaarVoorSessie(w){
+  if(w.soort==='alleen_info')return false;
+  if(!(w.akaart===null||w.akaart===true))return false;
+  // Verzamel iedereen die meedoet en check of elk een betaalwijze heeft.
+  const deelnemers=[];
+  if(w.hoofdMee!==false) deelnemers.push(w.betaalwijze);
+  (w.gezinsleden||[]).filter(g=>g.aangevinkt).forEach(g=>deelnemers.push(g.betaalwijze));
+  if(deelnemers.length===0) return false;          // niemand gekozen
+  if(deelnemers.some(b=>!b)) return false;          // iemand zonder betaalwijze
+  return true;
+}
+function watOntbreekt(w){
+  if(!(w.akaart===null||w.akaart===true)) return 'Vink eerst de A-Kaart af';
+  const deelnemers=[];
+  if(w.hoofdMee!==false) deelnemers.push(w.betaalwijze);
+  (w.gezinsleden||[]).filter(g=>g.aangevinkt).forEach(g=>deelnemers.push(g.betaalwijze));
+  if(deelnemers.length===0) return 'Kies minstens 1 persoon';
+  if(deelnemers.some(b=>!b)) return 'Kies voor iedereen een betaalwijze';
+  return '';
+}
+function kleurVan(w){
+  if(w.soort==='alleen_info') return 'info';
+  if(w.nieuw) return 'paars';
+  if(!(w.akaart===null||w.akaart===true)) return 'oranje';
+  return 'groen';
+}
+function tegoedBadgesHtml(lidId){
+  let h='<div class="tegoed-rij">';
+  ACTIVITEITEN.forEach(act=>{
+    const s=tegoedStatus(lidId,act.code);
+    if(s.abo) h+='<span class="tegoed-badge abo"><span class="sym">&#128197;</span> '+act.naam+': abo</span>';
+    else if(s.beurten>0) h+='<span class="tegoed-badge beurt">'+act.naam+': '+s.beurten+'</span>';
+    else h+='<span class="tegoed-badge geen">'+act.naam+': 0</span>';
+  });
+  h+='</div>';
+  return h;
+}
+function tekenWachtkamer(){
+  const lijst=document.getElementById('wachtlijst');
+  const open=Object.values(wachtenden).filter(w=>!w.sessie&&!w.geannuleerd);
+  lijst.innerHTML='';
+  if(open.length===0){lijst.innerHTML='<div class="leeg">Nog niemand in de wachtkamer.</div>';return;}
+  open.forEach(w=>{
+    const klaar=klaarVoorSessie(w);
+    const div=document.createElement('div');
+    div.className='wachtkaart '+kleurVan(w);
+    div.draggable=klaar;
+    div.ondragstart=e=>e.dataTransfer.setData('id',w.id);
+    let badge='';
+    if(w.soort==='alleen_info') badge='<span class="badge b-blauw"><span class="sym">&#8505;&#65039;</span> Alleen info &#8212; geen beurt</span>';
+    else if(w.nieuw) badge='<span class="badge b-paars"><span class="sym">&#10133;</span> Nieuw profiel</span>';
+    let checks='';
+    if(w.soort!=='alleen_info' && w.sociaal){
+      checks='<div class="checks"><span class="check akaart '+(w.akaart?'aan':'')+'" onclick="vinkAkaart('+w.id+')">'+(w.akaart?'&#9989;':'&#11036;')+' A-Kaart</span></div>';
+    }
+    let tegoed = w.soort!=='alleen_info' ? tegoedBadgesHtml(w.lidId) : '';
+    let gezinHtml='';
+    if(w.gezinsleden && w.gezinsleden.length>0){
+      gezinHtml='<div class="gezinblok"><div class="gezinkop"><span class="sym">&#128106;</span> Gezin &#8212; wie doet mee?</div>';
+      // Actief profiel (hoofdpersoon) bovenaan IN het gezinsvak, nu UIT te vinken.
+      gezinHtml+='<div class="gezinrij hoofd'+(w.hoofdMee?' aan':'')+'">'
+        +'<span class="gezincheck" onclick="vinkHoofd('+w.id+')">'+(w.hoofdMee?'&#9989;':'&#11036;')+'</span>'
+        +'<span class="gezinnaam"><b>'+w.naam.split(' ')[0]+'</b> <span style="font-size:12px;color:var(--grijs)">'+(w.hoofdMee?'(doet mee)':'(checkt alleen kinderen in)')+'</span></span></div>';
+      if(w.hoofdMee){
+        gezinHtml+='<div class="gezinsub">'+tegoedBadgesHtml(w.lidId)
+          +'<div class="betaalwijze-rij">'
+          +'<button class="bwn'+(w.betaalwijze==='tegoed'?' aan':'')+'" onclick="zetHoofdBetaalwijze('+w.id+',\'tegoed\')">beurt / abo</button>'
+          +'<button class="bwn'+(w.betaalwijze==='los'?' aan':'')+'" onclick="zetHoofdBetaalwijze('+w.id+',\'los\')">losse beurt</button>'
+          +'</div></div>';
+      }
+      // Gezinsleden eronder.
+      w.gezinsleden.forEach((g,gi)=>{
+        gezinHtml+='<div class="gezinrij'+(g.aangevinkt?' aan':'')+'">'
+          +'<span class="gezincheck" onclick="vinkGezinslid('+w.id+','+gi+')">'+(g.aangevinkt?'&#9989;':'&#11036;')+'</span>'
+          +'<span class="gezinnaam">'+g.naam+' <span style="font-size:12px;color:var(--grijs)">('+g.rol+')</span></span></div>';
+        if(g.aangevinkt){
+          gezinHtml+='<div class="gezinsub">'+tegoedBadgesHtml(g.lidId)
+            +'<div class="betaalwijze-rij">'
+            +'<button class="bwn'+(g.betaalwijze==='tegoed'?' aan':'')+'" onclick="zetBetaalwijze('+w.id+','+gi+',\'tegoed\')">beurt / abo</button>'
+            +'<button class="bwn'+(g.betaalwijze==='los'?' aan':'')+'" onclick="zetBetaalwijze('+w.id+','+gi+',\'los\')">losse beurt</button>'
+            +'</div></div>';
+        }
+      });
+      gezinHtml+='</div>';
+    } else if(w.soort!=='alleen_info'){
+      gezinHtml='<div class="betaalwijze-rij"><button class="bwn'+(w.betaalwijze==='tegoed'?' aan':'')+'" onclick="zetHoofdBetaalwijze('+w.id+',\'tegoed\')">beurt / abo</button>'
+        +'<button class="bwn'+(w.betaalwijze==='los'?' aan':'')+'" onclick="zetHoofdBetaalwijze('+w.id+',\'los\')">losse beurt</button></div>';
+    }
+    const hint=w.soort==='alleen_info'
+      ? '<div class="sleep-hint">Klik op &#10005; om te sluiten</div>'
+      : (klaar?'<div class="sleep-hint klaar">&#9989; Sleep naar de juiste sessie &#8594;</div>':'<div class="sleep-hint">'+watOntbreekt(w)+'</div>');
+    div.innerHTML='<button class="annuleer" title="Annuleer" onclick="annuleer('+w.id+')">&#10005;</button><button class="infoknop" title="Toon gegevens" onclick="toonProfiel(\''+w.lidId+'\')">&#8505;</button><div class="fotomini">&#128100;</div><div class="wk-info"><div class="naam">'+w.naam+'</div>'+(badge?'<div class="wk-status">'+badge+'</div>':'')+tegoed+checks+gezinHtml+hint+'</div>';
+    lijst.appendChild(div);
+  });
+}
+function vinkGezinslid(wid,gi){const g=wachtenden[wid].gezinsleden[gi];g.aangevinkt=!g.aangevinkt;if(!g.aangevinkt)g.betaalwijze=null;tekenWachtkamer();}
+function vinkHoofd(wid){const w=wachtenden[wid];w.hoofdMee=!w.hoofdMee;if(!w.hoofdMee)w.betaalwijze=null;tekenWachtkamer();}
+function zetBetaalwijze(wid,gi,wijze){wachtenden[wid].gezinsleden[gi].betaalwijze=wijze;tekenWachtkamer();}
+function zetHoofdBetaalwijze(wid,wijze){wachtenden[wid].betaalwijze=wijze;tekenWachtkamer();}
+function vinkAkaart(id){wachtenden[id].akaart=!wachtenden[id].akaart;tekenWachtkamer();}
+function annuleer(id){const w=wachtenden[id];if(!w)return;w.geannuleerd=true;delete wachtenden[id];tekenWachtkamer();tekenDag();toon('&#8617;&#65039; Check-in geannuleerd');}
+function dragOver(e,el){e.preventDefault();el.classList.add('over');}
+function dragLeave(el){el.classList.remove('over');}
+// Bepaalt het tegoed voor één persoon. Lenen gebeurt apart (async) in drop().
+function regelTegoed(persoonId, act, betaalwijze){
+  const l=ledenById[persoonId];
+  if(betaalwijze==='los') return {ok:true, bron:'los', afboeking:null};
+  if(aboTotVoor(l,act)) return {ok:true, bron:'abo', afboeking:null};
+  const eigen=eersteBeurtkaart(l,act);
+  if(eigen) return {ok:true, bron:'beurt', afboeking:{kaart:eigen}};
+  return {ok:false, geenTegoed:true};  // moet evt. lenen
+}
+function bronLabel(r){
+  if(r.bron==='abo')return 'abonnement';
+  if(r.bron==='beurt')return 'beurt';
+  if(r.bron==='geleend')return 'geleend van '+r.lenerNaam;
+  if(r.bron==='los')return 'losse beurt';
+  return r.bron;
+}
+// Toont een keuzevenster om van een gezinslid te lenen. Resolved met
+// {kaart, lenerNaam} of null (geannuleerd). Zelfde tarieftype krijgt voorrang/kleur.
+let leenResolver=null;
+function vraagLenen(persoon, act, gezinId){
+  return new Promise(resolve=>{
+    leenResolver=resolve;
+    const eigenTarief=tariefVan(persoon);
+    const leners=Object.values(leden).filter(x=>x.gezinId===gezinId && x.id!==persoon.id)
+      .map(x=>({lid:x, kaart:eersteBeurtkaart(x,act)})).filter(c=>c.kaart);
+    // Sorteer: zelfde tarieftype eerst.
+    leners.sort((a,b)=>{
+      const sa=tariefVan(a.lid)===eigenTarief?0:1, sb=tariefVan(b.lid)===eigenTarief?0:1;
+      return sa-sb;
+    });
+    document.getElementById('leen-uitleg').innerHTML=persoon.voornaam+' heeft geen '+activiteitNaam(act)+'-beurt meer. Van wie mag een beurt geleend worden?';
+    const box=document.getElementById('leen-opties');
+    box.innerHTML='';
+    leners.forEach((c,i)=>{
+      const zelfde=tariefVan(c.lid)===eigenTarief;
+      const b=document.createElement('button');
+      b.className='leen-knop'+(zelfde?' voorkeur':'');
+      b.innerHTML='<b>'+c.lid.voornaam+'</b> &#183; '+tariefVan(c.lid)+' &#183; nog '+c.kaart.beurten+' beurten'+(zelfde?' <span class="leen-tag">zelfde tarief</span>':'');
+      b.onclick=()=>{ const r=leenResolver; leenResolver=null; document.getElementById('overlay-lenen').classList.remove('open'); r({kaart:c.kaart, lenerNaam:c.lid.voornaam}); };
+      box.appendChild(b);
+    });
+    document.getElementById('overlay-lenen').classList.add('open');
+  });
+}
+function leenAnnuleer(){ if(leenResolver){ const r=leenResolver; leenResolver=null; document.getElementById('overlay-lenen').classList.remove('open'); r(null); } }
+
+async function drop(e,doelId){
+  e.preventDefault();document.querySelectorAll('.sessie').forEach(s=>s.classList.remove('over'));
+  const id=e.dataTransfer.getData('id');const w=wachtenden[id];if(!w)return;
+  if(!klaarVoorSessie(w)){toon('&#9888;&#65039; Vink eerst de A-Kaart af');return;}
+  const doel = doelId==='los' ? {naam:'losse klimsessie', activiteit:'klimmen'} : clubsessies.find(c=>c.id===doelId);
+  if(!doel){toon('&#9888;&#65039; Onbekende sessie');return;}
+  const act=doel.activiteit;
+  const l=ledenById[w.lidId];
+  const gezinId=l.gezinId;
+  const personen=[];
+  if(w.hoofdMee!==false){ personen.push({persoonId:w.lidId, naam:w.naam, betaalwijze:w.betaalwijze, isHoofd:true}); }
+  (w.gezinsleden||[]).filter(g=>g.aangevinkt).forEach(g=>personen.push({persoonId:g.lidId, naam:ledenById[g.lidId].voornaam+' '+ledenById[g.lidId].achternaam, betaalwijze:g.betaalwijze, isHoofd:false}));
+  if(personen.length===0){toon('&#9888;&#65039; Kies minstens 1 persoon om in te checken');return;}
+  const zonderKeuze=personen.filter(p=>!p.betaalwijze);
+  if(zonderKeuze.length>0){toon('&#9888;&#65039; Kies een betaalwijze voor: '+zonderKeuze.map(p=>p.naam.split(' ')[0]).join(', '));return;}
+
+  // Bepaal per persoon het tegoed; bij ontbreken evt. lenen (async, met keuze).
+  const resultaten=[];
+  for(const p of personen){
+    let r=regelTegoed(p.persoonId, act, p.betaalwijze);
+    if(r.geenTegoed){
+      const persoon=ledenById[p.persoonId];
+      // Zijn er gezinsleden om van te lenen?
+      const heeftLeners = gezinId && Object.values(leden).some(x=>x.gezinId===gezinId && x.id!==p.persoonId && eersteBeurtkaart(x,act));
+      if(heeftLeners){
+        const keuze=await vraagLenen(persoon, act, gezinId);
+        if(keuze){ r={ok:true, bron:'geleend', afboeking:{kaart:keuze.kaart}, lenerNaam:keuze.lenerNaam, geleendVan:keuze.lenerNaam}; }
+        else { toon('&#9888;&#65039; '+persoon.voornaam+' heeft geen tegoed en er werd niet geleend.'); return; }
+      } else {
+        toon('&#9888;&#65039; '+persoon.voornaam+' heeft geen '+activiteitNaam(act)+'-tegoed. Kies "losse beurt".'); return;
+      }
+    }
+    resultaten.push({p, r});
+  }
+
+  const lijst=document.getElementById('lijst-'+doelId);
+  resultaten.forEach(({p,r})=>{
+    if(r.afboeking){ r.afboeking.kaart.beurten--; }
+    if(p.isHoofd){
+      w.sessie=doelId; w.sessieAct=act; w.sessieNaam=doel.naam; w.bronTekst=bronLabel(r); w.afboekingKaart=r.afboeking?r.afboeking.kaart:null;
+    } else {
+      const kid=++wachtId;
+      dagcheckins.push({id:kid,lidId:p.persoonId,naam:p.naam,sociaal:ledenById[p.persoonId].sociaal,
+        soort:'check_in',sessie:doelId,sessieAct:act,sessieNaam:doel.naam,geannuleerd:false,tijd:nu(),wie:medewerker(),
+        groepVan:w.id,gezinsleden:[],bronTekst:bronLabel(r),afboekingKaart:r.afboeking?r.afboeking.kaart:null});
+    }
+    const rij=document.createElement('div');rij.className='toegewezen';
+    rij.innerHTML='<span class="sym">&#9989;</span> '+p.naam+' <span style="font-size:12px;opacity:.7">('+bronLabel(r)+')</span>';
+    lijst.appendChild(rij);
+  });
+  // Deed de hoofdpersoon zelf niet mee? Dan de wachtkaart toch afsluiten.
+  if(w.hoofdMee===false){
+    w.sessie=doelId; w.sessieAct=act; w.sessieNaam=doel.naam; w.afboekingKaart=null; w.alleenKinderen=true;
+    delete wachtenden[w.id];
+  }
+  tekenWachtkamer();tekenDag();
+  const meeNamen=resultaten.filter(x=>!x.p.isHoofd).map(x=>x.p.naam.split(' ')[0]);
+  const extra=meeNamen.length>0?' (met '+meeNamen.join(', ')+')':'';
+  toon('&#9989; '+w.naam+extra+' &#8594; '+doel.naam);
+}
+function tekenDag(){
+  const t=document.getElementById('dagtabel');
+  if(dagcheckins.length===0){t.innerHTML='<div class="leeg">Nog geen check-ins vandaag.</div>';return;}
+  t.innerHTML='';
+  [...dagcheckins].reverse().forEach(w=>{
+    const div=document.createElement('div');div.className='dagrij'+(w.geannuleerd?' geannuleerd':'');
+    let waar=w.geannuleerd?'geannuleerd':(w.alleenKinderen?'checkte kinderen in &#183; '+(w.sessieNaam||'sessie'):(w.sessie?(w.sessie==='los'?'losse klimsessie':(w.sessieNaam||'clubsessie')):(w.soort==='alleen_info'?'alleen info':'wachtkamer')));
+    div.innerHTML='<span class="tijd">'+w.tijd+'</span><div class="dnaam">'+w.naam+'<div class="dwie">'+w.wie+' &#183; '+waar+'</div></div>'+((!w.geannuleerd&&w.sessie)?'<button class="mini-knop blauw" onclick="herstelNaarWachtkamer('+w.id+')">&#8617;&#65039; Terug naar wachtkamer</button>':'');
+    t.appendChild(div);
+  });
+}
+function herstelNaarWachtkamer(id){
+  const w=dagcheckins.find(x=>x.id===id);if(!w||!w.sessie)return;
+  // Beurt teruggeven als die was afgeboekt.
+  if(w.afboekingKaart){ w.afboekingKaart.beurten++; w.afboekingKaart=null; }
+  const lijst=document.getElementById('lijst-'+w.sessie);
+  if(lijst)[...lijst.children].forEach(c=>{if(c.textContent.includes(w.naam))c.remove();});
+  // Hoofdpersoon komt terug in de wachtkamer; meegekomen gezinsleden worden los hersteld.
+  if(w.groepVan){
+    // Dit is een meegekomen gezinslid: gewoon uit de sessie halen (geen wachtkamer-terugkeer nodig).
+    w.sessie=null; w.geannuleerd=true;
+  } else {
+    w.sessie=null; w.sessieAct=null;
+    wachtenden[id]=w;
+  }
+  tekenWachtkamer();tekenDag();
+  toon('&#8617;&#65039; '+w.naam+' terug in de wachtkamer'+(w.afboekingKaart===null?'':' &#8212; beurt teruggezet'));
+}
+function zoek(){
+  const q=document.getElementById('zoekinput').value.trim().toLowerCase();
+  const box=document.getElementById('zoekresultaten');
+  if(q.length<1){box.innerHTML='';return;}
+  const treffers=Object.values(leden).filter(l=>(l.voornaam+' '+l.achternaam).toLowerCase().includes(q));
+  box.innerHTML='';
+  if(treffers.length===0){box.innerHTML='<div class="uitleg" style="text-align:left">Geen klant gevonden.</div>';return;}
+  treffers.forEach(l=>{
+    const aboGeldig=l.abo&&new Date(l.abo)>=new Date();
+    const st=aboGeldig?'Abonnement geldig':(l.beurten>0?l.beurten+' beurten over':'Geen beurten');
+    const r=document.createElement('div');r.className='zoekrij';
+    r.innerHTML='<div class="fotomini">&#128100;</div><div class="nm">'+l.voornaam+' '+l.achternaam+'<div class="st">'+st+'</div></div>';
+    const acties=document.createElement('div');acties.style.cssText='display:flex;flex-direction:column;gap:6px';
+    const bIn=document.createElement('button');bIn.className='mini-knop';bIn.style.color='var(--groen)';bIn.innerHTML='&#10003; Check-in';
+    bIn.onclick=ev=>{ev.stopPropagation();checkInLid(l,'check_in');document.getElementById('zoekinput').value='';box.innerHTML='';};
+    const bInfo=document.createElement('button');bInfo.className='mini-knop';bInfo.style.color='var(--blauw)';bInfo.innerHTML='&#8505;&#65039; Alleen info';
+    bInfo.onclick=ev=>{ev.stopPropagation();checkInLid(l,'alleen_info');document.getElementById('zoekinput').value='';box.innerHTML='';};
+    acties.appendChild(bIn);acties.appendChild(bInfo);r.appendChild(acties);box.appendChild(r);
+  });
+}
+function openNieuwProfiel(){document.getElementById('overlay-nieuw').classList.add('open');}
+function sluitNieuw(){document.getElementById('overlay-nieuw').classList.remove('open');}
+function maakNieuwProfiel(){
+  const vn=document.getElementById('np-voornaam').value.trim();
+  const an=document.getElementById('np-achternaam').value.trim();
+  if(!vn){toon('&#9888;&#65039; Vul minstens een voornaam in');return;}
+  const sociaal=document.getElementById('np-sociaal').value==='ja';
+  const id='nieuw'+(++nieuwTeller);
+  const l={id,voornaam:vn,achternaam:an,sociaal,abo:null,beurten:0,nieuw:true,sleutel:null,
+    jaar:document.getElementById('np-jaar').value||null,
+    postcode:document.getElementById('np-postcode').value||null,
+    herkomst:document.getElementById('np-herkomst').value||null};
+  ledenById[id]=l; sluitNieuw();
+  ['np-voornaam','np-achternaam','np-jaar','np-postcode','np-herkomst','np-herkomst-code'].forEach(x=>document.getElementById(x).value='');
+  landGekozen=null;
+  document.getElementById('np-land-tekst').innerHTML='Kies een land\u2026';
+  document.getElementById('np-land-knop').classList.remove('gekozen');
+  document.getElementById('np-sociaal').value='nee';
+  checkInLid(l,'check_in');
+  toon('&#9989; Profiel aangemaakt &#8212; staat in de wachtkamer');
+}
+function toonProfiel(lidId){
+  const l=ledenById[lidId]; if(!l) return;
+  const aboGeldig=l.abo&&new Date(l.abo)>=new Date();
+  const leeftijd=l.jaar?(new Date().getFullYear()-l.jaar)+' jaar':'&#8212;';
+  const lidmaatschap=aboGeldig?('Abonnement tot '+fmt(l.abo)):(l.beurten>0?(l.beurten+' beurten over'):'Geen beurten of abonnement');
+  const rij=(label,waarde)=>'<div class="profiel-rij"><span class="pl">'+label+'</span><span class="pv">'+waarde+'</span></div>';
+  document.getElementById('profiel-inhoud').innerHTML=
+    rij('Naam', l.voornaam+' '+(l.achternaam||''))
+    + rij('Geboortejaar', (l.jaar||'&#8212;')+(l.jaar?' ('+leeftijd+')':''))
+    + rij('Postcode', l.postcode||'&#8212;')
+    + rij('Land van herkomst', l.herkomst||'&#8212;')
+    + rij('Sociaal tarief', l.sociaal?'Ja &#8212; A-Kaart nodig':'Nee')
+    + rij('Lidmaatschap', lidmaatschap);
+  document.getElementById('overlay-profiel').classList.add('open');
+}
+function sluitProfiel(){document.getElementById('overlay-profiel').classList.remove('open');}
+function medewerker(){return document.getElementById('medewerker').value;}
+function nu(){return new Date().toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'});}
+function fmt(d){return new Date(d).toLocaleDateString('nl-BE',{day:'numeric',month:'short',year:'numeric'});}
+let toastTimer;
+function toon(t){const el=document.getElementById('toast');el.innerHTML=t;el.classList.add('open');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('open'),2800);}
+// ===========================================================================
+// ADMIN-MODUS (zie ledenbeheer voor uitleg; identiek gedrag)
+// ===========================================================================
+const ADMIN_RECHTEN={ 'Lana (admin)': true };
+const DEMO_WACHTWOORD='rising';
+const ADMIN_TIMEOUT=10*60*1000;
+let adminModusActief=false, adminTimer=null;
+try{ if(sessionStorage.getItem('ry_admin')==='1') adminModusActief=true; }catch(e){}
+function medewerkerMagAdmin(){ return ADMIN_RECHTEN[medewerker()]===true; }
+function isAdmin(){ return adminModusActief && medewerkerMagAdmin(); }
+function adminKnopActie(){
+  if(adminModusActief){ adminAfmelden(); return; }
+  if(!medewerkerMagAdmin()){ toon('&#9888;&#65039; '+medewerker()+' heeft geen admin-rechten'); return; }
+  document.getElementById('admin-uitleg').textContent='Geef het wachtwoord van '+medewerker()+' om in admin-modus te gaan.';
+  document.getElementById('admin-wachtwoord').value='';
+  document.getElementById('admin-fout').style.display='none';
+  document.getElementById('overlay-admin').classList.add('open');
+  setTimeout(()=>document.getElementById('admin-wachtwoord').focus(),50);
+}
+function sluitAdminLogin(){document.getElementById('overlay-admin').classList.remove('open');}
+function doeAdminLogin(){
+  const ww=document.getElementById('admin-wachtwoord').value;
+  if(ww===DEMO_WACHTWOORD){
+    adminModusActief=true;
+    try{ sessionStorage.setItem('ry_admin','1'); }catch(e){}
+    sluitAdminLogin(); werkAdminKnopBij(); startAdminTimer();
+    toon('&#128275; Admin-modus actief voor '+medewerker());
+  } else { document.getElementById('admin-fout').style.display='block'; }
+}
+function adminAfmelden(){
+  adminModusActief=false; if(adminTimer)clearTimeout(adminTimer);
+  try{ sessionStorage.removeItem('ry_admin'); }catch(e){}
+  werkAdminKnopBij();
+  toon('&#128274; Admin-modus afgesloten');
+}
+function werkAdminKnopBij(){
+  const k=document.getElementById('admin-knop');
+  if(adminModusActief){ k.innerHTML='<span class="sym">&#128275;</span> Admin actief &#183; afmelden'; k.classList.remove('knop-grijs'); k.classList.add('knop-groen'); }
+  else { k.innerHTML='<span class="sym">&#128274;</span> Admin login'; k.classList.remove('knop-groen'); k.classList.add('knop-grijs'); }
+  const tab=document.getElementById('admin-portaal-tab');
+  if(tab) tab.style.display=adminModusActief?'inline-block':'none';
+}
+function startAdminTimer(){
+  if(adminTimer)clearTimeout(adminTimer);
+  adminTimer=setTimeout(()=>{ if(adminModusActief){ adminModusActief=false; try{sessionStorage.removeItem('ry_admin');}catch(e){} werkAdminKnopBij(); toon('&#128274; Admin-modus verlopen (10 min inactief)'); } }, ADMIN_TIMEOUT);
+}
+['click','keydown','mousemove'].forEach(ev=>document.addEventListener(ev,()=>{ if(adminModusActief)startAdminTimer(); }));
+function medewerkerGewijzigd(){
+  if(adminModusActief){ adminModusActief=false; if(adminTimer)clearTimeout(adminTimer); }
+  werkAdminKnopBij();
+}
+werkAdminKnopBij();
+tekenSessies();
+document.getElementById('scaninput').focus();
+function tekenSessies(){
+  const box=document.getElementById('sessies');
+  box.innerHTML='';
+  // Losse klimsessie (altijd klimmen)
+  const vakLos=document.createElement('div');
+  vakLos.className='sessie los'; vakLos.id='sessie-los';
+  vakLos.setAttribute('ondragover','dragOver(event,this)');
+  vakLos.setAttribute('ondragleave','dragLeave(this)');
+  vakLos.setAttribute('ondrop','drop(event,\'los\')');
+  vakLos.innerHTML='<h3><span class="sym">&#129695;</span> Losse klimsessie</h3><div class="act-tag">Klimmen</div><div id="lijst-los"></div>';
+  box.appendChild(vakLos);
+  // Clubsessies van vandaag (op weekdag)
+  const vandaag=sessiesVandaag();
+  if(vandaag.length===0){
+    const info=document.createElement('div');
+    info.style.cssText='color:var(--grijs);font-size:14px;padding:10px;align-self:center';
+    info.textContent='Geen clubsessies vandaag.';
+    box.appendChild(info);
+  }
+  vandaag.forEach(c=>{
+    const vak=document.createElement('div');
+    vak.className='sessie club'; vak.id='sessie-'+c.id;
+    vak.setAttribute('ondragover','dragOver(event,this)');
+    vak.setAttribute('ondragleave','dragLeave(this)');
+    vak.setAttribute('ondrop','drop(event,\''+c.id+'\')');
+    vak.innerHTML='<h3><span class="sym">&#128101;</span> '+c.naam+'</h3><div class="act-tag">'+activiteitNaam(c.activiteit)+'</div><div id="lijst-'+c.id+'"></div>';
+    box.appendChild(vak);
+  });
+}
+</script>
+</body>
+</html>

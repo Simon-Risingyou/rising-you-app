@@ -1,0 +1,16 @@
+# Afhankelijkheden
+node_modules/
+dist/
+
+# Geheimen — NOOIT committen
+.env
+.env.local
+
+# Tauri build-output
+src-tauri/target/
+src-tauri/gen/
+
+# Systeembestanden
+.DS_Store
+Thumbs.db
+*.log

@@ -1,0 +1,1032 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rising You — Ledenbeheer</title>
+<style>
+  :root{
+    --groen:#1e8a4c; --groen-licht:#e3f5ea;
+    --rood:#cc2b2b; --rood-licht:#fbe7e7;
+    --geel:#e6a700; --geel-licht:#fdf3d6;
+    --blauw:#1f6fb2; --blauw-licht:#e6f0f9;
+    --paars:#5a4ab7; --paars-licht:#ece9fb;
+    --oranje:#d2691e; --oranje-licht:#fbeede;
+    --grijs:#5f5e5a; --lijn:#dcdad2; --bg:#f4f2ec; --wit:#fff; --tekst:#2c2c2a;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:var(--bg);color:var(--tekst);font-size:17px;line-height:1.4}
+  .balk{background:var(--wit);border-bottom:2px solid var(--lijn);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  .logo{font-size:22px;font-weight:700;color:var(--blauw)}
+  .logo span{color:var(--groen)}
+  .tabs{display:flex;gap:8px}
+  .tab{font-size:15px;padding:8px 16px;border:2px solid var(--lijn);border-radius:10px;background:var(--wit);cursor:pointer;text-decoration:none;color:var(--tekst);font-weight:600}
+  .tab.actief{background:var(--blauw);color:#fff;border-color:var(--blauw)}
+  .tab.admin-tab{border-color:var(--paars);color:var(--paars)}
+  .tab.admin-tab:hover{background:var(--paars-licht)}
+  .medewerker{display:flex;align-items:center;gap:10px;font-size:16px}
+  .medewerker select{font-size:16px;padding:8px 12px;border:2px solid var(--lijn);border-radius:10px;background:var(--wit)}
+  .sym{font-size:1.15em;line-height:1}
+  .layout{display:grid;grid-template-columns:340px 1fr;gap:16px;padding:16px;max-width:1400px;margin:0 auto}
+  @media(max-width:900px){.layout{grid-template-columns:1fr}}
+  .kaart{background:var(--wit);border:2px solid var(--lijn);border-radius:16px;padding:18px}
+  .kaart h2{font-size:19px;font-weight:600;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .knop{font-size:16px;font-weight:600;padding:12px 16px;border:none;border-radius:11px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;justify-content:center}
+  .knop-blauw{background:var(--blauw);color:#fff}
+  .knop-grijs{background:#eceae3;color:var(--tekst)}
+  .knop-groen{background:var(--groen);color:#fff}
+  .knop-rood-omlijnd{background:var(--wit);color:var(--rood);border:2px solid var(--rood)}
+  .knop-groot{width:100%}
+  .zoek-input{font-size:16px;padding:11px;border:2px solid var(--lijn);border-radius:10px;width:100%}
+  .ledenlijst{margin-top:12px;display:flex;flex-direction:column;gap:8px;max-height:62vh;overflow:auto}
+  .ledenrij{border:2px solid var(--lijn);border-radius:11px;padding:10px;display:flex;align-items:center;gap:10px;cursor:pointer}
+  .ledenrij:hover{background:var(--blauw-licht);border-color:var(--blauw)}
+  .ledenrij.gekozen{background:var(--blauw-licht);border-color:var(--blauw)}
+  .avatar{width:46px;height:46px;border-radius:10px;background:#eceae3;display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--grijs);flex-shrink:0;overflow:hidden}
+  .avatar img{width:100%;height:100%;object-fit:cover}
+  .ledenrij .nm{font-weight:600;flex:1}
+  .ledenrij .st{font-size:13px;color:var(--grijs)}
+  .leeg{color:var(--grijs);text-align:center;padding:22px;font-size:15px}
+  .detail-leeg{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;color:var(--grijs);text-align:center;gap:10px}
+  .detail-kop{display:flex;gap:16px;align-items:center;margin-bottom:18px}
+  .detail-avatar{width:96px;height:96px;border-radius:16px;background:#eceae3;display:flex;align-items:center;justify-content:center;font-size:42px;color:var(--grijs);flex-shrink:0;overflow:hidden;position:relative}
+  .detail-avatar img{width:100%;height:100%;object-fit:cover}
+  .detail-naam{font-size:24px;font-weight:700}
+  .detail-sub{font-size:15px;color:var(--grijs);margin-top:2px}
+  .sectie{margin-top:18px;padding-top:18px;border-top:2px solid var(--lijn)}
+  .sectie h3{font-size:16px;font-weight:600;margin-bottom:12px;display:flex;align-items:center;gap:7px}
+  .veld{margin-bottom:12px}
+  .veld label{display:block;font-size:14px;font-weight:600;margin-bottom:4px}
+  .veld input,.veld select{width:100%;font-size:16px;padding:10px;border:2px solid var(--lijn);border-radius:10px}
+  .veld-rij{display:flex;gap:10px;flex-wrap:wrap}
+  .veld-rij .veld{flex:1;min-width:130px}
+  .land-knop{width:100%;font-size:16px;padding:10px;border:2px solid var(--lijn);border-radius:10px;background:var(--wit);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left}
+  .land-knop:hover{border-color:var(--blauw)}
+  .land-knop.gekozen{border-color:var(--groen);background:var(--groen-licht)}
+  .lidmaatschap-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:600px){.lidmaatschap-grid{grid-template-columns:1fr}}
+  .act-blok{margin-bottom:14px;padding:12px;border:2px solid var(--lijn);border-radius:12px;background:#faf9f5}
+  .act-kop{font-size:15px;font-weight:700;color:var(--blauw);margin-bottom:10px}
+  .tarief-kn{flex:1;font-size:14px;padding:9px;border:2px solid var(--lijn);border-radius:9px;background:var(--wit);cursor:pointer;font-weight:600;color:var(--grijs)}
+  .mini-knop{font-size:13px;padding:6px 10px;border-radius:8px;border:2px solid var(--lijn);background:var(--wit);cursor:pointer;font-weight:600}
+  .mini-knop.actief-tarief{border-color:var(--blauw);background:var(--blauw-licht);color:var(--blauw)}
+  .tarief-kn.aan{border-color:var(--groen);background:var(--groen-licht);color:var(--groen)}
+  .mvak{border:2px solid var(--lijn);border-radius:12px;padding:14px}
+  .mvak .groot{font-size:30px;font-weight:700;color:var(--groen)}
+  .mvak .klein{font-size:14px;color:var(--grijs)}
+  .opties{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+  .opties button{font-size:14px;padding:8px 12px;border:2px solid var(--blauw);background:var(--wit);color:var(--blauw);border-radius:10px;cursor:pointer;font-weight:600}
+  .opties button:hover{background:var(--blauw-licht)}
+  .acties-balk{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;padding-top:18px;border-top:2px solid var(--lijn)}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:15px;cursor:pointer;user-select:none}
+  .switch{position:relative;width:42px;height:24px;background:var(--lijn);border-radius:12px;transition:.2s;flex-shrink:0}
+  .switch.aan{background:var(--geel)}
+  .switch::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s}
+  .switch.aan::after{transform:translateX(18px)}
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;padding:20px;z-index:50}
+  .overlay.open{display:flex}
+  .modal{background:var(--wit);border-radius:18px;width:100%;max-width:460px;padding:22px;max-height:92vh;overflow:auto}
+  .modal h3{font-size:20px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .landrij{display:flex;align-items:center;gap:12px;padding:12px 14px;border:2px solid var(--lijn);border-radius:12px;cursor:pointer;font-size:17px}
+  .landrij:hover{background:var(--blauw-licht);border-color:var(--blauw)}
+  .landrij .vlag{font-size:26px;width:34px;text-align:center}
+  .land-kop{font-size:13px;font-weight:700;color:var(--grijs);text-transform:uppercase;letter-spacing:.04em;margin:6px 2px 2px}
+  .cam-wrap{display:flex;flex-direction:column;align-items:center;gap:12px}
+  #cam-video,#cam-foto{width:100%;max-width:320px;aspect-ratio:1/1;object-fit:cover;border-radius:14px;background:#111}
+  .qr-kaart{width:340px;border:2px solid var(--lijn);border-radius:12px;padding:16px;display:flex;gap:14px;align-items:center;background:#fff}
+  .qr-kaart .qrcode{width:96px;height:96px;flex-shrink:0}
+  .qr-kaart .qr-naam{font-size:20px;font-weight:700}
+  .qr-kaart .qr-sub{font-size:13px;color:var(--grijs)}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--tekst);color:#fff;padding:13px 20px;border-radius:12px;font-size:16px;display:none;align-items:center;gap:10px;z-index:80;max-width:90vw}
+  .toast.open{display:flex}
+  @media print{body *{visibility:hidden}#print-zone,#print-zone *{visibility:visible}#print-zone{position:absolute;left:0;top:0}}
+</style>
+</head>
+<body>
+<div class="balk">
+  <div class="logo">Rising <span>You</span> — Ledenbeheer</div>
+  <div class="tabs">
+    <a class="tab" href="#" onclick="return false" id="tab-checkin">&#128247; Check-in</a>
+    <a class="tab actief" href="#" onclick="return false" id="tab-ledenbeheer">&#128100; Ledenbeheer</a>
+    <a class="tab admin-tab" id="admin-portaal-tab" href="#" onclick="window.location.href='admin-portaal.html';return false" style="display:none">&#128273; Admin portaal</a>
+  </div>
+  <div class="medewerker"><span class="sym">&#128100;</span><span>Wie werkt nu?</span>
+    <select id="medewerker" onchange="medewerkerGewijzigd()"><option>Sara</option><option>Mehmet</option><option>Joke</option><option>Lana (admin)</option></select>
+    <button class="knop knop-grijs" id="admin-knop" style="font-size:14px;padding:8px 12px" onclick="adminKnopActie()"><span class="sym">&#128274;</span> Admin login</button>
+  </div>
+</div>
+
+<div class="layout">
+  <div class="kaart">
+    <h2><span class="sym">&#128269;</span> Leden</h2>
+    <input class="zoek-input" id="zoekinput" placeholder="Zoek op naam&#8230;" oninput="tekenLeden()">
+    <button class="knop knop-groen knop-groot" style="margin-top:10px" onclick="nieuwLid()"><span class="sym">&#10133;</span> Nieuw lid</button>
+    <div class="ledenlijst" id="ledenlijst"></div>
+  </div>
+
+  <div class="kaart" id="detailkaart">
+    <div class="detail-leeg" id="detail-leeg">
+      <span style="font-size:46px">&#128100;</span>
+      <div>Kies een lid uit de lijst<br>of maak een nieuw lid aan.</div>
+    </div>
+    <div id="detail" style="display:none"></div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-land">
+  <div class="modal" style="max-width:440px">
+    <h3><span class="sym">&#127757;</span> Kies een land</h3>
+    <input class="zoek-input" id="land-zoek" placeholder="Typ een land&#8230;" oninput="tekenLanden()" style="margin-bottom:10px">
+    <div id="land-lijst" style="max-height:46vh;overflow:auto;display:flex;flex-direction:column;gap:6px"></div>
+    <button class="knop knop-grijs knop-groot" style="margin-top:14px" onclick="sluitLandKiezer()">Annuleer</button>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-admin">
+  <div class="modal" style="max-width:380px">
+    <h3><span class="sym">&#128274;</span> Admin login</h3>
+    <p style="font-size:15px;color:var(--grijs);margin-bottom:14px" id="admin-uitleg"></p>
+    <div class="veld"><label>Wachtwoord</label>
+      <input type="password" id="admin-wachtwoord" placeholder="Wachtwoord&#8230;" onkeydown="if(event.key==='Enter')doeAdminLogin()">
+    </div>
+    <div id="admin-fout" style="display:none;color:var(--rood);font-size:14px;margin-bottom:10px"><span class="sym">&#9888;&#65039;</span> Wachtwoord klopt niet.</div>
+    <div style="display:flex;gap:10px">
+      <button class="knop knop-grijs" style="flex:1" onclick="sluitAdminLogin()">Annuleer</button>
+      <button class="knop knop-groen" style="flex:1" onclick="doeAdminLogin()"><span class="sym">&#128275;</span> Inloggen</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-toevoegbeurt">
+  <div class="modal" style="max-width:400px">
+    <h3><span class="sym">&#127915;</span> <span id="tb-titel">Beurten toevoegen</span></h3>
+    <div style="font-size:14px;font-weight:600;margin-bottom:6px">Tarief</div>
+    <div id="tb-tarief" style="display:flex;gap:6px;margin-bottom:14px"></div>
+    <div style="text-align:center;margin-bottom:12px"><span style="font-size:40px;font-weight:700;color:var(--groen)" id="tb-aantal">0</span> <span style="color:var(--grijs)">beurten</span></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:12px">
+      <button class="mini-knop" onclick="tbTel(1)">+1</button>
+      <button class="mini-knop" onclick="tbTel(5)">+5</button>
+      <button class="mini-knop" onclick="tbTel(10)">+10</button>
+      <button class="mini-knop" onclick="tbTel(20)">+20</button>
+      <button class="mini-knop" onclick="tbReset()">Reset</button>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="knop knop-grijs" style="flex:1" onclick="document.getElementById('overlay-toevoegbeurt').classList.remove('open')">Annuleer</button>
+      <button class="knop knop-groen" style="flex:1" onclick="tbBevestig()"><span class="sym">&#10003;</span> Bevestig</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-toevoegabo">
+  <div class="modal" style="max-width:400px">
+    <h3><span class="sym">&#128197;</span> <span id="ta-titel">Abonnement</span></h3>
+    <div style="font-size:14px;font-weight:600;margin-bottom:6px">Tarief</div>
+    <div id="ta-tarief" style="display:flex;gap:6px;margin-bottom:14px"></div>
+    <div style="font-size:14px;font-weight:600;margin-bottom:6px">Duur</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      <button class="mini-knop" style="flex:1" onclick="taKies(3)">3 mnd</button>
+      <button class="mini-knop" style="flex:1" onclick="taKies(6)">6 mnd</button>
+      <button class="mini-knop" style="flex:1" onclick="taKies(12)">12 mnd</button>
+    </div>
+    <div id="ta-bevestig" style="display:none;padding:10px;border:2px solid var(--blauw);border-radius:10px;background:var(--blauw-licht);margin-bottom:12px">
+      <div style="font-size:14px" id="ta-tekst"></div>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="knop knop-grijs" style="flex:1" onclick="document.getElementById('overlay-toevoegabo').classList.remove('open')">Annuleer</button>
+      <button class="knop knop-groen" style="flex:1" onclick="taBevestig()"><span class="sym">&#10003;</span> Toevoegen</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-gezin">
+  <div class="modal" style="max-width:440px">
+    <h3><span class="sym">&#128106;</span> <span id="gezin-titel">Gezin</span></h3>
+    <div id="gezin-stap-naam" style="display:none">
+      <div class="veld"><label>Naam van het gezin</label><input id="gezin-naam" placeholder="bv. Gezin Janssens"></div>
+      <button class="knop knop-groen knop-groot" onclick="bevestigGezinMaken()"><span class="sym">&#10003;</span> Gezin maken</button>
+    </div>
+    <div id="gezin-stap-toevoegen" style="display:none">
+      <div class="veld"><label>Wie toevoegen?</label>
+        <input class="zoek-input" id="gezin-zoek" placeholder="Zoek een lid op naam&#8230;" oninput="tekenGezinZoek()"></div>
+      <div id="gezin-zoek-resultaat" style="max-height:40vh;overflow:auto;margin-bottom:10px"></div>
+    </div>
+    <button class="knop knop-grijs knop-groot" style="margin-top:10px" onclick="sluitGezin()">Sluiten</button>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-rol">
+  <div class="modal" style="max-width:360px">
+    <h3><span class="sym">&#128100;</span> Welke rol?</h3>
+    <p style="font-size:15px;color:var(--grijs);margin-bottom:14px" id="rol-uitleg"></p>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <button class="knop knop-grijs knop-groot" onclick="kiesRol('voogd')"><span class="sym">&#128104;</span> Voogd (ouder/begeleider)</button>
+      <button class="knop knop-grijs knop-groot" onclick="kiesRol('kind')"><span class="sym">&#129490;</span> Kind</button>
+      <button class="knop knop-grijs knop-groot" onclick="kiesRol('lid')"><span class="sym">&#128100;</span> Ander gezinslid</button>
+      <button class="knop knop-grijs knop-groot" onclick="sluitRol()">Annuleer</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-fotokeuze">
+  <div class="modal" style="max-width:380px">
+    <h3><span class="sym">&#128247;</span> Profielfoto</h3>
+    <p style="font-size:15px;color:var(--grijs);margin-bottom:14px">Maak een foto met de webcam of kies een bestand van de computer.</p>
+    <button class="knop knop-blauw knop-groot" style="margin-bottom:10px" onclick="sluitFotoKeuze();openCam()"><span class="sym">&#128247;</span> Webcam gebruiken</button>
+    <button class="knop knop-blauw knop-groot" style="margin-bottom:10px" onclick="document.getElementById('foto-upload').click()"><span class="sym">&#128228;</span> Bestand kiezen</button>
+    <input type="file" id="foto-upload" accept="image/*" style="display:none" onchange="laadUpload(event)">
+    <button class="knop knop-grijs knop-groot" onclick="sluitFotoKeuze()">Annuleer</button>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-bijsnijden">
+  <div class="modal" style="max-width:420px">
+    <h3><span class="sym">&#9986;&#65039;</span> Foto bijsnijden</h3>
+    <p style="font-size:14px;color:var(--grijs);margin-bottom:12px">Sleep om te verschuiven. Gebruik de schuifbalk om in te zoomen. De foto wordt vierkant en verkleind opgeslagen.</p>
+    <div id="crop-vak" style="position:relative;width:300px;height:300px;margin:0 auto;border-radius:14px;overflow:hidden;background:#111;touch-action:none;cursor:move">
+      <img id="crop-img" style="position:absolute;transform-origin:0 0;user-select:none;pointer-events:none" alt="">
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin:12px 0">
+      <span class="sym">&#128270;</span>
+      <input type="range" id="crop-zoom" min="100" max="300" value="100" style="flex:1" oninput="updateCrop()">
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="knop knop-grijs" style="flex:1" onclick="sluitBijsnijden()">Annuleer</button>
+      <button class="knop knop-groen" style="flex:1" onclick="bewaarBijgesneden()"><span class="sym">&#10003;</span> Bewaren</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-cam">
+  <div class="modal">
+    <h3><span class="sym">&#128247;</span> Profielfoto maken</h3>
+    <div class="cam-wrap">
+      <video id="cam-video" autoplay playsinline></video>
+      <canvas id="cam-canvas" style="display:none"></canvas>
+      <img id="cam-foto" style="display:none" alt="Gemaakte foto">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+        <button class="knop knop-blauw" id="cam-knip" onclick="knipFoto()"><span class="sym">&#128247;</span> Foto nemen</button>
+        <button class="knop knop-grijs" id="cam-opnieuw" onclick="opnieuwFoto()" style="display:none"><span class="sym">&#8635;</span> Opnieuw</button>
+        <button class="knop knop-groen" id="cam-bewaar" onclick="bewaarFoto()" style="display:none"><span class="sym">&#10003;</span> Bewaren</button>
+        <button class="knop knop-grijs" onclick="sluitCam()">Sluiten</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-print">
+  <div class="modal" style="max-width:420px">
+    <h3><span class="sym">&#128424;&#65039;</span> Kaartje printen</h3>
+    <p style="font-size:15px;color:var(--grijs);margin-bottom:14px">Het oude kaartje wordt automatisch ongeldig zodra je een nieuw kaartje print.</p>
+    <div id="print-zone" style="display:flex;justify-content:center;margin-bottom:16px">
+      <div class="qr-kaart">
+        <div class="qrcode" id="qr-target"></div>
+        <div><div class="qr-naam" id="qr-naam"></div><div class="qr-sub">Rising You &#8212; klimlidkaart</div></div>
+      </div>
+    </div>
+    <div id="qr-codes-info" style="font-size:13px;color:var(--grijs);text-align:center;margin-bottom:14px"></div>
+    <div style="display:flex;gap:10px">
+      <button class="knop knop-grijs" style="flex:1" onclick="sluitPrint()">Annuleer</button>
+      <button class="knop knop-blauw" style="flex:1" onclick="doePrint()"><span class="sym">&#128424;&#65039;</span> Printen</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+const LANDEN=[
+  {naam:"Afghanistan",code:"AF",vlag:"\uD83C\uDDE6\uD83C\uDDEB",veel:true},
+  {naam:"Syri\u00eb",code:"SY",vlag:"\uD83C\uDDF8\uD83C\uDDFE",veel:true},
+  {naam:"Oekra\u00efne",code:"UA",vlag:"\uD83C\uDDFA\uD83C\uDDE6",veel:true},
+  {naam:"Soedan",code:"SD",vlag:"\uD83C\uDDF8\uD83C\uDDE9",veel:true},
+  {naam:"Eritrea",code:"ER",vlag:"\uD83C\uDDEA\uD83C\uDDF7",veel:true},
+  {naam:"Somali\u00eb",code:"SO",vlag:"\uD83C\uDDF8\uD83C\uDDF4",veel:true},
+  {naam:"Irak",code:"IQ",vlag:"\uD83C\uDDEE\uD83C\uDDF6",veel:true},
+  {naam:"Iran",code:"IR",vlag:"\uD83C\uDDEE\uD83C\uDDF7",veel:true},
+  {naam:"Marokko",code:"MA",vlag:"\uD83C\uDDF2\uD83C\uDDE6",veel:true},
+  {naam:"Turkije",code:"TR",vlag:"\uD83C\uDDF9\uD83C\uDDF7",veel:true},
+  {naam:"Venezuela",code:"VE",vlag:"\uD83C\uDDFB\uD83C\uDDEA",veel:true},
+  {naam:"China",code:"CN",vlag:"\uD83C\uDDE8\uD83C\uDDF3",veel:true},
+  {naam:"Algerije",code:"DZ",vlag:"\uD83C\uDDE9\uD83C\uDDFF"},
+  {naam:"Congo (DR)",code:"CD",vlag:"\uD83C\uDDE8\uD83C\uDDE9"},
+  {naam:"Egypte",code:"EG",vlag:"\uD83C\uDDEA\uD83C\uDDEC"},
+  {naam:"Ethiopi\u00eb",code:"ET",vlag:"\uD83C\uDDEA\uD83C\uDDF9"},
+  {naam:"Georgi\u00eb",code:"GE",vlag:"\uD83C\uDDEC\uD83C\uDDEA"},
+  {naam:"Guinee",code:"GN",vlag:"\uD83C\uDDEC\uD83C\uDDF3"},
+  {naam:"India",code:"IN",vlag:"\uD83C\uDDEE\uD83C\uDDF3"},
+  {naam:"Kameroen",code:"CM",vlag:"\uD83C\uDDE8\uD83C\uDDF2"},
+  {naam:"Nigeria",code:"NG",vlag:"\uD83C\uDDF3\uD83C\uDDEC"},
+  {naam:"Pakistan",code:"PK",vlag:"\uD83C\uDDF5\uD83C\uDDF0"},
+  {naam:"Palestina",code:"PS",vlag:"\uD83C\uDDF5\uD83C\uDDF8"},
+  {naam:"Rusland",code:"RU",vlag:"\uD83C\uDDF7\uD83C\uDDFA"},
+  {naam:"Tunesi\u00eb",code:"TN",vlag:"\uD83C\uDDF9\uD83C\uDDF3"},
+  {naam:"Belgi\u00eb",code:"BE",vlag:"\uD83C\uDDE7\uD83C\uDDEA"},
+  {naam:"Ander land",code:"XX",vlag:"\uD83C\uDF0D"},
+];
+
+// Elk lid heeft nu MEERDERE beurtenkaarten en abonnementen, elk met een
+// activiteit (klimmen/yoga/workout) en een tarief (kind/student/volwassene).
+// beurtenkaarten: [{activiteit, tarief, beurten}], abonnementen: [{activiteit, tarief, tot}]
+const ACTIVITEITEN=[{code:"klimmen",naam:"Klimmen"},{code:"yoga",naam:"Yoga"},{code:"workout",naam:"We Workout"}];
+let leden=[
+  {id:"guy",   voornaam:"Guy",   achternaam:"Janssens",jaar:1985, postcode:"2018", herkomst:"Belgi\u00eb",  herkomstCode:"BE", sociaal:false, foto:null, tariefHandmatig:null, qr:"RY-guy", gezinId:"g1", gezinRol:"voogd",
+    beurtenkaarten:[{activiteit:"klimmen",tarief:"volwassene",beurten:12}], abonnementen:[{activiteit:"yoga",tarief:"volwassene",tot:"2026-12-31"}]},
+  {id:"sam",   voornaam:"Sam",   achternaam:"Janssens",jaar:2014, postcode:"2018", herkomst:"Belgi\u00eb",  herkomstCode:"BE", sociaal:false, foto:null, tariefHandmatig:null, qr:"RY-sam", gezinId:"g1", gezinRol:"kind",
+    beurtenkaarten:[{activiteit:"klimmen",tarief:"kind",beurten:3}], abonnementen:[]},
+  {id:"simon", voornaam:"Simon", achternaam:"Janssens",jaar:2016, postcode:"2018", herkomst:"Belgi\u00eb",  herkomstCode:"BE", sociaal:false, foto:null, tariefHandmatig:null, qr:"RY-simon", gezinId:"g1", gezinRol:"kind",
+    beurtenkaarten:[{activiteit:"klimmen",tarief:"kind",beurten:0}], abonnementen:[]},
+  {id:"anna",  voornaam:"Anna",  achternaam:"Petrova", jaar:1992, postcode:"2018", herkomst:"Oekra\u00efne", herkomstCode:"UA", sociaal:false, foto:null, tariefHandmatig:null, qr:"RY-anna", gezinId:null, gezinRol:null,
+    beurtenkaarten:[{activiteit:"klimmen",tarief:"volwassene",beurten:5}], abonnementen:[]},
+  {id:"omar",  voornaam:"Omar",  achternaam:"Haddad",  jaar:2001, postcode:"2060", herkomst:"Syri\u00eb",  herkomstCode:"SY", sociaal:true,  foto:null, tariefHandmatig:null, qr:"RY-omar", gezinId:null, gezinRol:null,
+    beurtenkaarten:[{activiteit:"klimmen",tarief:"student",beurten:1}], abonnementen:[]},
+  {id:"lin",   voornaam:"Lin",   achternaam:"Chen",    jaar:1988, postcode:"2000", herkomst:"China",    herkomstCode:"CN", sociaal:false, foto:null, tariefHandmatig:null, qr:"RY-lin", gezinId:null, gezinRol:null,
+    beurtenkaarten:[], abonnementen:[{activiteit:"klimmen",tarief:"volwassene",tot:"2026-12-31"}]},
+  {id:"diego", voornaam:"Diego", achternaam:"Morales", jaar:1995, postcode:"2140", herkomst:"Venezuela",herkomstCode:"VE", sociaal:true,  foto:null, tariefHandmatig:null, qr:"RY-diego", gezinId:null, gezinRol:null,
+    beurtenkaarten:[], abonnementen:[{activiteit:"klimmen",tarief:"volwassene",tot:"2026-12-31"}]},
+];
+const gezinnen={ "g1": {id:"g1", naam:"Gezin Janssens"} };
+
+// --- Tarieftype afleiden: handmatig wint, anders op leeftijd (kind 0-13, student 14+) ---
+function tariefVan(l){
+  if(l.tariefHandmatig) return l.tariefHandmatig;
+  if(!l.jaar) return 'volwassene';
+  const leeftijd=new Date().getFullYear()-Number(l.jaar);
+  if(leeftijd<=13) return 'kind';
+  if(leeftijd<=25) return 'student';
+  return 'volwassene';
+}
+function activiteitNaam(code){const a=ACTIVITEITEN.find(x=>x.code===code);return a?a.naam:code;}
+function aboGeldigVoor(l,activiteit){return (l.abonnementen||[]).some(a=>a.activiteit===activiteit && new Date(a.tot)>=new Date());}
+function aboTotVoor(l,activiteit){const a=(l.abonnementen||[]).filter(x=>x.activiteit===activiteit && new Date(x.tot)>=new Date()).sort((p,q)=>new Date(q.tot)-new Date(p.tot))[0];return a?a.tot:null;}
+function beurtenVoor(l,activiteit){return (l.beurtenkaarten||[]).filter(k=>k.activiteit===activiteit).reduce((s,k)=>s+k.beurten,0);}
+let gekozenId=null, landDoel=null, camStream=null, camFotoData=null;
+
+function medewerker(){return document.getElementById('medewerker').value;}
+function logHandeling(h,lidId){console.log('[LOG]',new Date().toLocaleTimeString('nl-BE'),medewerker(),'-',h,'(lid:'+lidId+')');}
+function fmt(d){return d?new Date(d).toLocaleDateString('nl-BE',{day:'numeric',month:'short',year:'numeric'}):'';}
+function aboGeldig(l){return l.abo&&new Date(l.abo)>=new Date();}
+let toastTimer;
+function toon(t){const el=document.getElementById('toast');el.innerHTML=t;el.classList.add('open');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('open'),2800);}
+
+function tekenLeden(){
+  const q=document.getElementById('zoekinput').value.trim().toLowerCase();
+  const box=document.getElementById('ledenlijst');
+  const lijst=leden.filter(l=>(l.voornaam+' '+l.achternaam).toLowerCase().includes(q));
+  box.innerHTML='';
+  if(lijst.length===0){box.innerHTML='<div class="leeg">Geen leden gevonden.</div>';return;}
+  lijst.forEach(l=>{
+    const klim=beurtenVoor(l,'klimmen'); const aboK=aboGeldigVoor(l,'klimmen');
+    const st=aboK?'Abonnement klimmen':(klim>0?klim+' klimbeurten':'Geen klimtegoed');
+    const r=document.createElement('div');r.className='ledenrij'+(l.id===gekozenId?' gekozen':'');
+    const av=l.foto?'<img src="'+l.foto+'">':'&#128100;';
+    r.innerHTML='<div class="avatar">'+av+'</div><div class="nm">'+l.voornaam+' '+l.achternaam+'<div class="st">'+st+'</div></div>';
+    r.onclick=()=>kiesLid(l.id);
+    box.appendChild(r);
+  });
+}
+
+function kiesLid(id){gekozenId=id;beurtTeller=0;aboKeuze=null;tekenLeden();tekenDetail();}
+
+function tekenDetail(){
+  const l=leden.find(x=>x.id===gekozenId);
+  document.getElementById('detail-leeg').style.display=l?'none':'flex';
+  const d=document.getElementById('detail');
+  d.style.display=l?'block':'none';
+  if(!l)return;
+  const av=l.foto?'<img src="'+l.foto+'">':'&#128100;';
+  const land=LANDEN.find(x=>x.code===l.herkomstCode);
+  const landTekst=land?(land.vlag+' '+land.naam):(l.herkomst||'Kies een land\u2026');
+  d.innerHTML=
+   '<div class="detail-kop">'
+   +'<div class="detail-avatar">'+av+'</div>'
+   +'<div><div class="detail-naam">'+l.voornaam+' '+l.achternaam+'</div>'
+   +'<div class="detail-sub">'+(l.jaar?(new Date().getFullYear()-l.jaar)+' jaar':'')+(l.sociaal?' &#183; sociaal tarief':'')+'</div>'
+   +'<button class="knop knop-grijs" style="margin-top:8px;font-size:14px;padding:8px 12px" onclick="openFotoKeuze()"><span class="sym">&#128247;</span> '+(l.foto?'Foto wijzigen':'Foto toevoegen')+'</button>'
+   + (l.foto?'<button class="knop knop-rood-omlijnd" style="margin-top:8px;margin-left:6px;font-size:14px;padding:8px 12px" onclick="verwijderFoto()"><span class="sym">&#128465;&#65039;</span> Foto weg</button>':'')
+   +'</div>'
+   +'</div>'
+
+   +'<div class="sectie"><h3><span class="sym">&#9999;&#65039;</span> Gegevens</h3>'
+   +'<div class="veld-rij">'
+   +'<div class="veld"><label>Voornaam</label><input id="d-voornaam" value="'+(l.voornaam||'')+'"></div>'
+   +'<div class="veld"><label>Achternaam</label><input id="d-achternaam" value="'+(l.achternaam||'')+'"></div></div>'
+   +'<div class="veld-rij">'
+   +'<div class="veld"><label>Geboortejaar</label><input id="d-jaar" type="number" value="'+(l.jaar||'')+'"></div>'
+   +'<div class="veld"><label>Postcode</label><input id="d-postcode" value="'+(l.postcode||'')+'"></div></div>'
+   +'<div class="veld"><label>Land van herkomst</label>'
+   +'<button type="button" class="land-knop'+(l.herkomstCode?' gekozen':'')+'" id="d-land-knop" onclick="openLandKiezer(\'detail\')"><span id="d-land-tekst">'+landTekst+'</span><span class="sym">&#9662;</span></button></div>'
+   +'<label class="toggle" style="margin-top:6px"><span class="switch'+(l.sociaal?' aan':'')+'" id="d-sociaal-switch" onclick="toggleSociaal()"></span> Sociaal tarief (A-Kaart nodig)</label>'
+   + tariefSectieHTML(l)
+   +'<button class="knop knop-blauw knop-groot" style="margin-top:14px" onclick="bewaarGegevens()"><span class="sym">&#10003;</span> Gegevens bewaren</button>'
+   +'</div>'
+
+   + lidmaatschapSectieHTML(l)
+   + sessieHistoriekHTML(l)
+   +'</div>'
+
+   +'<div class="sectie"><h3><span class="sym">&#128179;</span> Kaartje</h3>'
+   +'<div style="font-size:14px;color:var(--grijs);margin-bottom:10px">Huidige code: <b>'+(l.qr||'geen')+'</b></div>'
+   +'<button class="knop knop-blauw knop-groot" onclick="openPrint()"><span class="sym">&#128424;&#65039;</span> Nieuw kaartje printen (oude wordt ongeldig)</button>'
+   +'</div>'
+   + gezinSectieHTML(l)
+   + adminVerwijderHTML(l);
+}
+
+// --- Gezin-sectie in het detailscherm ---
+function gezinSectieHTML(l){
+  let h='<div class="sectie"><h3><span class="sym">&#128106;</span> Gezin</h3>';
+  if(l.gezinId && gezinnen[l.gezinId]){
+    const gezinNaam=gezinnen[l.gezinId].naam;
+    const leden_=ledenInGezin(l.gezinId);
+    h+='<div style="font-size:14px;color:var(--grijs);margin-bottom:8px"><b>'+gezinNaam+'</b></div>';
+    leden_.forEach(m=>{
+      const rolLabel=rolTekst(m);
+      const ikZelf=m.id===l.id;
+      h+='<div style="display:flex;align-items:center;gap:10px;padding:8px;border:2px solid var(--lijn);border-radius:10px;margin-bottom:6px'+(ikZelf?';background:var(--blauw-licht)':'')+'">'
+        +'<div class="avatar" style="width:36px;height:36px;font-size:18px">'+(m.foto?'<img src="'+m.foto+'">':'&#128100;')+'</div>'
+        +'<span style="flex:1">'+m.voornaam+' '+m.achternaam+' <span style="font-size:13px;color:var(--grijs)">('+rolLabel+')</span></span>'
+        + (ikZelf?'':'<button class="knop knop-rood-omlijnd" style="font-size:12px;padding:5px 9px" onclick="haalUitGezin(\''+m.id+'\')">Uit gezin</button>')
+        +'</div>';
+    });
+    h+='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">'
+      +'<button class="knop knop-grijs" style="font-size:14px;padding:9px" onclick="openGezinToevoegen()"><span class="sym">&#10133;</span> Lid toevoegen</button>'
+      +'<button class="knop knop-rood-omlijnd" style="font-size:14px;padding:9px" onclick="haalUitGezin(\''+l.id+'\')">Dit lid uit gezin</button></div>';
+  } else {
+    h+='<div style="font-size:14px;color:var(--grijs);margin-bottom:10px">Dit lid hoort nog niet bij een gezin.</div>'
+      +'<button class="knop knop-grijs knop-groot" onclick="openGezinMaken()"><span class="sym">&#128106;</span> Gezin maken of bij gezin voegen</button>';
+  }
+  h+='</div>';
+  return h;
+}
+function ledenInGezin(gezinId){
+  const rolOrde={voogd:0,lid:1,kind:2};
+  return leden.filter(x=>x.gezinId===gezinId)
+    .sort((a,b)=>(rolOrde[a.gezinRol]??9)-(rolOrde[b.gezinRol]??9)||a.voornaam.localeCompare(b.voornaam));
+}
+function rolTekst(m){
+  if(m.gezinRol==='voogd')return 'voogd';
+  if(m.gezinRol==='kind')return 'kind';
+  return 'lid';
+}
+
+function nieuwLid(){
+  const id='lid'+Date.now();
+  leden.unshift({id,voornaam:"Nieuw lid",achternaam:"",jaar:null,postcode:"",herkomst:"",herkomstCode:"",sociaal:false,foto:null,tariefHandmatig:null,qr:"RY-"+Math.random().toString(16).slice(2,10),gezinId:null,gezinRol:null,beurtenkaarten:[],abonnementen:[]});
+  logHandeling('lid_aangemaakt',id);
+  gekozenId=id;document.getElementById('zoekinput').value='';
+  tekenLeden();tekenDetail();
+  toon('&#9989; Nieuw lid aangemaakt &#8212; vul de gegevens aan');
+}
+function bewaarGegevens(){
+  const l=leden.find(x=>x.id===gekozenId);if(!l)return;
+  l.voornaam=document.getElementById('d-voornaam').value.trim();
+  l.achternaam=document.getElementById('d-achternaam').value.trim();
+  l.jaar=document.getElementById('d-jaar').value||null;
+  l.postcode=document.getElementById('d-postcode').value.trim();
+  logHandeling('gegevens_bewerkt',l.id);
+  tekenLeden();tekenDetail();
+  toon('&#9989; Gegevens bewaard');
+}
+function toggleSociaal(){
+  const l=leden.find(x=>x.id===gekozenId);if(!l)return;
+  l.sociaal=!l.sociaal;
+  document.getElementById('d-sociaal-switch').classList.toggle('aan',l.sociaal);
+  logHandeling('sociaal_tarief_'+(l.sociaal?'aan':'uit'),l.id);
+}
+// --- Beurten: opteller + bevestiging ---
+let beurtTeller=0, aboKeuze=null;
+// sessieActies: per lid een lijst van wat deze sessie is toegevoegd (ongedaan maakbaar)
+const sessieActies={};
+
+function telBeurt(n){
+  beurtTeller+=n;
+  document.getElementById('beurt-aantal').textContent=beurtTeller;
+  document.getElementById('beurt-bevestig').style.display='block';
+}
+function resetBeurtTeller(){
+  beurtTeller=0;
+  const el=document.getElementById('beurt-bevestig'); if(el)el.style.display='none';
+}
+
+// --- Tarieftype-sectie (kind/student/volwassene) ---
+function tariefSectieHTML(l){
+  const auto=tariefVan(l);
+  const handmatig=l.tariefHandmatig;
+  let h='<div style="margin-top:12px;padding:10px;border:2px solid var(--lijn);border-radius:10px">'
+    +'<div style="font-size:14px;font-weight:600;margin-bottom:6px">Tarieftype: <b style="color:var(--blauw)">'+auto+'</b>'
+    + (handmatig?' <span style="font-size:12px;color:var(--grijs)">(handmatig)</span>':' <span style="font-size:12px;color:var(--grijs)">(op leeftijd)</span>')+'</div>'
+    +'<div style="font-size:12px;color:var(--grijs);margin-bottom:6px">Kind 0-13, student 14-25, volwassene 26+. Je kan dit handmatig wijzigen.</div>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap">'
+    +'<button class="mini-knop'+(auto==='kind'?' actief-tarief':'')+'" onclick="zetTarief(\'kind\')">kind</button>'
+    +'<button class="mini-knop'+(auto==='student'?' actief-tarief':'')+'" onclick="zetTarief(\'student\')">student</button>'
+    +'<button class="mini-knop'+(auto==='volwassene'?' actief-tarief':'')+'" onclick="zetTarief(\'volwassene\')">volwassene</button>'
+    + (handmatig?'<button class="mini-knop" onclick="zetTarief(null)">auto (leeftijd)</button>':'')
+    +'</div></div>';
+  return h;
+}
+function zetTarief(t){
+  const l=leden.find(x=>x.id===gekozenId);if(!l)return;
+  l.tariefHandmatig=t;
+  logHandeling('tarieftype_'+(t||'auto'),l.id);
+  tekenLeden();tekenDetail();
+  toon('&#9989; Tarieftype: '+(t||'automatisch op leeftijd'));
+}
+
+// --- Lidmaatschap-sectie: per activiteit beurten + abonnement ---
+function lidmaatschapSectieHTML(l){
+  let h='<div class="sectie"><h3><span class="sym">&#127915;</span> Lidmaatschap</h3>';
+  ACTIVITEITEN.forEach(act=>{
+    const beurten=beurtenVoor(l,act.code);
+    const aboTot=aboTotVoor(l,act.code);
+    h+='<div class="act-blok">'
+      +'<div class="act-kop">'+act.naam+'</div>'
+      +'<div class="lidmaatschap-grid">'
+      // beurten-vak
+      +'<div class="mvak"><div class="groot">'+beurten+'</div><div class="klein">beurten</div>'
+      +'<button class="mini-knop" style="margin-top:8px" onclick="openToevoegBeurt(\''+act.code+'\')"><span class="sym">&#10133;</span> Beurten</button></div>'
+      // abo-vak
+      +'<div class="mvak"><div class="groot" style="font-size:16px;color:'+(aboTot?'var(--groen)':'var(--grijs)')+'">'+(aboTot?'tot '+fmt(aboTot):'geen abo')+'</div><div class="klein">abonnement</div>'
+      +'<button class="mini-knop" style="margin-top:8px" onclick="openToevoegAbo(\''+act.code+'\')"><span class="sym">&#10133;</span> Abonnement</button></div>'
+      +'</div></div>';
+  });
+  h+='</div>';
+  return h;
+}
+
+// --- Beurten toevoegen (per activiteit, met tarief en opteller) ---
+let toevoegActiviteit=null, toevoegTarief=null;
+function openToevoegBeurt(activiteit){
+  toevoegActiviteit=activiteit;
+  const l=leden.find(x=>x.id===gekozenId);
+  toevoegTarief=tariefVan(l);
+  beurtTeller=0;
+  document.getElementById('tb-titel').textContent='Beurten toevoegen — '+activiteitNaam(activiteit);
+  document.getElementById('tb-aantal').textContent='0';
+  tekenTariefKeuze('tb-tarief');
+  document.getElementById('overlay-toevoegbeurt').classList.add('open');
+}
+function tbTel(n){beurtTeller+=n;document.getElementById('tb-aantal').textContent=beurtTeller;}
+function tbReset(){beurtTeller=0;document.getElementById('tb-aantal').textContent='0';}
+function tbBevestig(){
+  const l=leden.find(x=>x.id===gekozenId);if(!l||beurtTeller<=0){toon('&#9888;&#65039; Kies een aantal');return;}
+  const aantal=beurtTeller;
+  let kaart=l.beurtenkaarten.find(k=>k.activiteit===toevoegActiviteit && k.tarief===toevoegTarief);
+  if(kaart) kaart.beurten+=aantal; else l.beurtenkaarten.push({activiteit:toevoegActiviteit,tarief:toevoegTarief,beurten:aantal});
+  registreerSessieActie(l.id,{type:'beurten',activiteit:toevoegActiviteit,tarief:toevoegTarief,aantal,omschrijving:aantal+' beurten '+activiteitNaam(toevoegActiviteit)+' ('+toevoegTarief+')'});
+  logHandeling('beurten_toegevoegd_'+toevoegActiviteit+'_'+aantal,l.id);
+  document.getElementById('overlay-toevoegbeurt').classList.remove('open');
+  tekenLeden();tekenDetail();
+  toon('&#127915; '+aantal+' beurten '+activiteitNaam(toevoegActiviteit)+' toegevoegd');
+}
+
+// --- Abonnement toevoegen (per activiteit, met tarief, stapelt op einddatum) ---
+let aboMaanden=null;
+function openToevoegAbo(activiteit){
+  toevoegActiviteit=activiteit;
+  const l=leden.find(x=>x.id===gekozenId);
+  toevoegTarief=tariefVan(l);
+  aboMaanden=null;
+  document.getElementById('ta-titel').textContent='Abonnement — '+activiteitNaam(activiteit);
+  tekenTariefKeuze('ta-tarief');
+  document.getElementById('ta-bevestig').style.display='none';
+  document.getElementById('overlay-toevoegabo').classList.add('open');
+}
+function taKies(m){
+  aboMaanden=m;
+  const l=leden.find(x=>x.id===gekozenId);
+  const huidigeTot=aboTotVoor(l,toevoegActiviteit);
+  const basis=(huidigeTot && new Date(huidigeTot)>=new Date())?new Date(huidigeTot):new Date();
+  const d=new Date(basis); d.setMonth(d.getMonth()+m);
+  document.getElementById('ta-tekst').innerHTML='Abonnement <b>'+m+' maanden</b>'+(huidigeTot?' bovenop huidig (tot '+fmt(huidigeTot)+')':'')+'<br>Nieuwe einddatum: <b>'+fmt(d.toISOString().slice(0,10))+'</b>';
+  document.getElementById('ta-bevestig').style.display='block';
+}
+function taBevestig(){
+  const l=leden.find(x=>x.id===gekozenId);if(!l||!aboMaanden)return;
+  const huidig=l.abonnementen.find(a=>a.activiteit===toevoegActiviteit && new Date(a.tot)>=new Date());
+  const basis=(huidig && new Date(huidig.tot)>=new Date())?new Date(huidig.tot):new Date();
+  const d=new Date(basis); d.setMonth(d.getMonth()+aboMaanden);
+  const nieuweTot=d.toISOString().slice(0,10);
+  const vorigeTot=huidig?huidig.tot:null;
+  if(huidig) huidig.tot=nieuweTot; else l.abonnementen.push({activiteit:toevoegActiviteit,tarief:toevoegTarief,tot:nieuweTot});
+  registreerSessieActie(l.id,{type:'abo',activiteit:toevoegActiviteit,maanden:aboMaanden,vorigeTot,omschrijving:'Abonnement '+aboMaanden+' mnd '+activiteitNaam(toevoegActiviteit)});
+  logHandeling('abonnement_'+toevoegActiviteit+'_'+aboMaanden+'mnd',l.id);
+  document.getElementById('overlay-toevoegabo').classList.remove('open');
+  tekenLeden();tekenDetail();
+  toon('&#128197; Abonnement '+aboMaanden+' maanden '+activiteitNaam(toevoegActiviteit)+' toegevoegd');
+}
+
+// Tariefkeuze-knoppen (kind/student/volwassene) binnen een toevoeg-venster.
+function tekenTariefKeuze(containerId){
+  const box=document.getElementById(containerId);
+  box.innerHTML='';
+  ['kind','student','volwassene'].forEach(t=>{
+    const b=document.createElement('button');
+    b.className='tarief-kn'+(t===toevoegTarief?' aan':'');
+    b.textContent=t;
+    b.onclick=()=>{toevoegTarief=t;tekenTariefKeuze(containerId);};
+    box.appendChild(b);
+  });
+}
+
+// --- Sessie-historiek met ongedaan maken ---
+function registreerSessieActie(lidId,actie){
+  if(!sessieActies[lidId])sessieActies[lidId]=[];
+  actie.tijd=new Date().toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'});
+  actie.wie=medewerker();
+  sessieActies[lidId].push(actie);
+}
+function sessieHistoriekHTML(l){
+  const acties=sessieActies[l.id]||[];
+  if(acties.length===0)return '';
+  let h='<div style="margin-top:14px;padding:12px;border:2px dashed var(--lijn);border-radius:11px">'
+    +'<div style="font-size:14px;font-weight:600;color:var(--grijs);margin-bottom:8px">&#9851;&#65039; Toegevoegd in deze sessie (kan ongedaan)</div>';
+  acties.forEach((a,i)=>{
+    h+='<div style="display:flex;align-items:center;gap:10px;font-size:14px;padding:6px 0">'
+      +'<span style="flex:1">'+a.tijd+' &#183; '+a.omschrijving+' <span style="color:var(--grijs)">('+a.wie+')</span></span>'
+      +'<button class="knop knop-rood-omlijnd" style="font-size:13px;padding:6px 10px" onclick="ongedaan(\''+l.id+'\','+i+')">&#8617;&#65039; Ongedaan</button></div>';
+  });
+  h+='</div>';
+  return h;
+}
+function ongedaan(lidId,index){
+  const l=leden.find(x=>x.id===lidId);const acties=sessieActies[lidId];
+  if(!l||!acties||!acties[index])return;
+  const a=acties[index];
+  if(a.type==='beurten'){
+    const kaart=l.beurtenkaarten.find(k=>k.activiteit===a.activiteit && k.tarief===a.tarief);
+    if(kaart) kaart.beurten=Math.max(0,kaart.beurten-a.aantal);
+    acties.splice(index,1);
+  } else if(a.type==='abo'){
+    // Zet de einddatum van dat abonnement terug naar wat het was.
+    const abo=l.abonnementen.find(x=>x.activiteit===a.activiteit);
+    if(abo){
+      if(a.vorigeTot) abo.tot=a.vorigeTot;
+      else l.abonnementen=l.abonnementen.filter(x=>x!==abo);
+    }
+    acties.splice(index,1);
+  } else {
+    acties.splice(index,1);
+  }
+  logHandeling('ongedaan_'+a.type,lidId);
+  tekenLeden();tekenDetail();
+  toon('&#8617;&#65039; Ongedaan gemaakt: '+a.omschrijving);
+}
+
+// --- Admin: profiel verwijderen ---
+// ===========================================================================
+// ADMIN-MODUS
+// 'Wie werkt nu?' blijft laagdrempelig. Om in admin-modus te gaan moet de
+// geselecteerde medewerker admin-rechten hebben en het wachtwoord ingeven.
+// Admin-modus blijft actief tot afmelden of na 10 min inactiviteit.
+// In de echte app gebeurt de wachtwoordcontrole via Supabase Auth.
+// ===========================================================================
+const ADMIN_RECHTEN={ 'Lana (admin)': true };   // wie mag admin worden
+const DEMO_WACHTWOORD='rising';                  // alleen voor het prototype
+const ADMIN_TIMEOUT=10*60*1000;                  // 10 minuten
+let adminModusActief=false, adminTimer=null;
+try{ if(sessionStorage.getItem('ry_admin')==='1') adminModusActief=true; }catch(e){}
+
+function medewerkerMagAdmin(){ return ADMIN_RECHTEN[medewerker()]===true; }
+function isAdmin(){ return adminModusActief && medewerkerMagAdmin(); }
+
+function adminKnopActie(){
+  if(adminModusActief){ adminAfmelden(); return; }
+  if(!medewerkerMagAdmin()){
+    toon('&#9888;&#65039; '+medewerker()+' heeft geen admin-rechten');
+    return;
+  }
+  document.getElementById('admin-uitleg').textContent='Geef het wachtwoord van '+medewerker()+' om in admin-modus te gaan.';
+  document.getElementById('admin-wachtwoord').value='';
+  document.getElementById('admin-fout').style.display='none';
+  document.getElementById('overlay-admin').classList.add('open');
+  setTimeout(()=>document.getElementById('admin-wachtwoord').focus(),50);
+}
+function sluitAdminLogin(){document.getElementById('overlay-admin').classList.remove('open');}
+function doeAdminLogin(){
+  const ww=document.getElementById('admin-wachtwoord').value;
+  if(ww===DEMO_WACHTWOORD){
+    adminModusActief=true;
+    try{ sessionStorage.setItem('ry_admin','1'); }catch(e){}
+    sluitAdminLogin();
+    werkAdminKnopBij();
+    startAdminTimer();
+    logHandeling('admin_login',medewerker());
+    if(gekozenId)tekenDetail();
+    toon('&#128275; Admin-modus actief voor '+medewerker());
+  } else {
+    document.getElementById('admin-fout').style.display='block';
+  }
+}
+function adminAfmelden(){
+  adminModusActief=false;
+  try{ sessionStorage.removeItem('ry_admin'); }catch(e){}
+  if(adminTimer)clearTimeout(adminTimer);
+  werkAdminKnopBij();
+  logHandeling('admin_logout',medewerker());
+  if(gekozenId)tekenDetail();
+  toon('&#128274; Admin-modus afgesloten');
+}
+function werkAdminKnopBij(){
+  const k=document.getElementById('admin-knop');
+  if(adminModusActief){
+    k.innerHTML='<span class="sym">&#128275;</span> Admin actief &#183; afmelden';
+    k.classList.remove('knop-grijs'); k.classList.add('knop-groen');
+  } else {
+    k.innerHTML='<span class="sym">&#128274;</span> Admin login';
+    k.classList.remove('knop-groen'); k.classList.add('knop-grijs');
+  }
+  const tab=document.getElementById('admin-portaal-tab');
+  if(tab) tab.style.display=adminModusActief?'inline-block':'none';
+}
+function startAdminTimer(){
+  if(adminTimer)clearTimeout(adminTimer);
+  adminTimer=setTimeout(()=>{
+    if(adminModusActief){ adminModusActief=false; try{sessionStorage.removeItem('ry_admin');}catch(e){} werkAdminKnopBij(); if(gekozenId)tekenDetail(); toon('&#128274; Admin-modus verlopen (10 min inactief)'); }
+  }, ADMIN_TIMEOUT);
+}
+// Elke handeling verlengt de admin-sessie.
+['click','keydown','mousemove'].forEach(ev=>document.addEventListener(ev,()=>{ if(adminModusActief)startAdminTimer(); }));
+
+// Wisselen van medewerker sluit admin-modus (andere persoon achter de kassa).
+function medewerkerGewijzigd(){
+  if(adminModusActief){ adminModusActief=false; if(adminTimer)clearTimeout(adminTimer); }
+  werkAdminKnopBij();
+  if(gekozenId)tekenDetail();
+}
+// --- Gezin beheren ---
+let gezinToevoegLid=null;  // lid dat we aan een gezin toevoegen (voor rol-keuze)
+let gezinNieuwTeller=1;
+
+function openGezinMaken(){
+  document.getElementById('gezin-titel').textContent='Nieuw gezin';
+  document.getElementById('gezin-stap-naam').style.display='block';
+  document.getElementById('gezin-stap-toevoegen').style.display='none';
+  const l=leden.find(x=>x.id===gekozenId);
+  document.getElementById('gezin-naam').value=l?('Gezin '+(l.achternaam||l.voornaam)):'';
+  document.getElementById('overlay-gezin').classList.add('open');
+}
+function bevestigGezinMaken(){
+  const naam=document.getElementById('gezin-naam').value.trim();
+  if(!naam){toon('&#9888;&#65039; Geef het gezin een naam');return;}
+  const l=leden.find(x=>x.id===gekozenId);if(!l)return;
+  const gid='g'+(++gezinNieuwTeller)+Date.now();
+  gezinnen[gid]={id:gid,naam};
+  // het huidige lid wordt voogd by default
+  l.gezinId=gid; l.gezinRol='voogd';
+  logHandeling('gezin_aangemaakt',l.id);
+  sluitGezin();tekenDetail();
+  toon('&#9989; Gezin "'+naam+'" gemaakt');
+}
+function openGezinToevoegen(){
+  document.getElementById('gezin-titel').textContent='Lid toevoegen aan gezin';
+  document.getElementById('gezin-stap-naam').style.display='none';
+  document.getElementById('gezin-stap-toevoegen').style.display='block';
+  document.getElementById('gezin-zoek').value='';
+  document.getElementById('gezin-zoek-resultaat').innerHTML='';
+  document.getElementById('overlay-gezin').classList.add('open');
+  setTimeout(()=>document.getElementById('gezin-zoek').focus(),50);
+}
+function tekenGezinZoek(){
+  const q=document.getElementById('gezin-zoek').value.trim().toLowerCase();
+  const box=document.getElementById('gezin-zoek-resultaat');
+  const l=leden.find(x=>x.id===gekozenId);
+  box.innerHTML='';
+  if(q.length<1)return;
+  const treffers=leden.filter(x=>x.id!==gekozenId && x.gezinId!==l.gezinId &&
+    (x.voornaam+' '+x.achternaam).toLowerCase().includes(q));
+  if(treffers.length===0){box.innerHTML='<div style="color:var(--grijs);padding:8px">Geen lid gevonden.</div>';return;}
+  treffers.forEach(m=>{
+    const r=document.createElement('div');r.className='ledenrij';
+    r.innerHTML='<div class="avatar" style="width:36px;height:36px;font-size:18px">'+(m.foto?'<img src="'+m.foto+'">':'&#128100;')+'</div><div class="nm">'+m.voornaam+' '+m.achternaam+(m.gezinId?'<div class="st" style="color:var(--rood)">zit al in een ander gezin</div>':'')+'</div>';
+    r.onclick=()=>vraagRol(m.id);
+    box.appendChild(r);
+  });
+}
+function vraagRol(lidId){
+  gezinToevoegLid=lidId;
+  const m=leden.find(x=>x.id===lidId);
+  document.getElementById('rol-uitleg').textContent='Welke rol heeft '+m.voornaam+' in dit gezin?';
+  document.getElementById('overlay-rol').classList.add('open');
+}
+function kiesRol(rol){
+  const l=leden.find(x=>x.id===gekozenId);
+  const m=leden.find(x=>x.id===gezinToevoegLid);
+  if(l&&m&&l.gezinId){
+    m.gezinId=l.gezinId; m.gezinRol=rol;
+    logHandeling('gezinslid_toegevoegd_'+rol,m.id);
+    toon('&#9989; '+m.voornaam+' toegevoegd als '+rol);
+  }
+  sluitRol();sluitGezin();tekenDetail();
+}
+function sluitRol(){document.getElementById('overlay-rol').classList.remove('open');gezinToevoegLid=null;}
+function sluitGezin(){document.getElementById('overlay-gezin').classList.remove('open');}
+function haalUitGezin(lidId){
+  const m=leden.find(x=>x.id===lidId);if(!m)return;
+  if(!confirm(m.voornaam+' uit het gezin halen?'))return;
+  m.gezinId=null; m.gezinRol=null;
+  logHandeling('gezinslid_verwijderd',m.id);
+  tekenDetail();
+  toon('&#8617;&#65039; '+m.voornaam+' uit gezin gehaald');
+}
+
+function adminVerwijderHTML(l){
+  if(!isAdmin())return '';
+  return '<div class="sectie"><h3 style="color:var(--rood)"><span class="sym">&#128465;&#65039;</span> Admin</h3>'
+    +'<button class="knop knop-rood-omlijnd knop-groot" onclick="verwijderLid(\''+l.id+'\')">&#128465;&#65039; Dit profiel verwijderen</button></div>';
+}
+function verwijderLid(id){
+  if(!isAdmin()){toon('&#9888;&#65039; Alleen een admin kan verwijderen');return;}
+  const l=leden.find(x=>x.id===id);if(!l)return;
+  if(!confirm('Profiel van '+l.voornaam+' '+l.achternaam+' definitief verwijderen?\nDit kan niet ongedaan gemaakt worden.'))return;
+  leden=leden.filter(x=>x.id!==id);
+  logHandeling('lid_verwijderd',id);
+  gekozenId=null;
+  tekenLeden();tekenDetail();
+  toon('&#128465;&#65039; Profiel verwijderd');
+}
+
+function openLandKiezer(doel){landDoel=doel;document.getElementById('land-zoek').value='';tekenLanden();document.getElementById('overlay-land').classList.add('open');setTimeout(()=>document.getElementById('land-zoek').focus(),50);}
+function sluitLandKiezer(){document.getElementById('overlay-land').classList.remove('open');}
+function tekenLanden(){
+  const q=document.getElementById('land-zoek').value.trim().toLowerCase();
+  const box=document.getElementById('land-lijst');box.innerHTML='';
+  const maakRij=(l)=>{const r=document.createElement('div');r.className='landrij';r.innerHTML='<span class="vlag">'+l.vlag+'</span><span>'+l.naam+'</span>';r.onclick=()=>kiesLand(l);return r;};
+  if(q){
+    const tr=LANDEN.filter(l=>l.code!=='XX'&&l.naam.toLowerCase().includes(q));
+    if(tr.length===0)box.innerHTML='<div class="leeg">Geen land gevonden. Kies "Ander land".</div>';
+    tr.forEach(l=>box.appendChild(maakRij(l)));
+    box.appendChild(maakRij(LANDEN.find(l=>l.code==='XX')));return;
+  }
+  const k1=document.createElement('div');k1.className='land-kop';k1.textContent='Vaak gekozen';box.appendChild(k1);
+  LANDEN.filter(l=>l.veel).forEach(l=>box.appendChild(maakRij(l)));
+  const k2=document.createElement('div');k2.className='land-kop';k2.textContent='Andere landen';box.appendChild(k2);
+  LANDEN.filter(l=>!l.veel).forEach(l=>box.appendChild(maakRij(l)));
+}
+function kiesLand(l){
+  const lid=leden.find(x=>x.id===gekozenId);if(lid){lid.herkomst=l.naam;lid.herkomstCode=l.code;logHandeling('herkomst_'+l.code,lid.id);}
+  document.getElementById('d-land-tekst').innerHTML=l.vlag+' '+l.naam;
+  document.getElementById('d-land-knop').classList.add('gekozen');
+  sluitLandKiezer();
+}
+
+function openFotoKeuze(){document.getElementById('overlay-fotokeuze').classList.add('open');}
+function verwijderFoto(){
+  const l=leden.find(x=>x.id===gekozenId);if(!l||!l.foto)return;
+  if(!confirm('Foto van '+l.voornaam+' verwijderen?'))return;
+  l.foto=null;
+  logHandeling('foto_verwijderd',l.id);
+  tekenLeden();tekenDetail();
+  toon('&#128465;&#65039; Foto verwijderd');
+}
+function sluitFotoKeuze(){document.getElementById('overlay-fotokeuze').classList.remove('open');}
+
+// --- Upload + bijsnijden ---
+let cropState={img:null,x:0,y:0,scale:1,baseW:0,baseH:0,dragging:false,sx:0,sy:0};
+const CROP_BOX=300;       // grootte van het bijsnijvak op het scherm
+const OPSLAG_GROOTTE=256; // uiteindelijke opgeslagen fotogrootte (klein voor db)
+
+function laadUpload(ev){
+  const file=ev.target.files[0];
+  ev.target.value='';
+  if(!file)return;
+  sluitFotoKeuze();
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{ startBijsnijden(img); };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function startBijsnijden(img){
+  cropState.img=img;
+  // schaal zodat de kortste zijde het vak vult
+  const ratio=Math.max(CROP_BOX/img.width, CROP_BOX/img.height);
+  cropState.baseW=img.width*ratio;
+  cropState.baseH=img.height*ratio;
+  cropState.scale=1;
+  cropState.x=(CROP_BOX-cropState.baseW)/2;
+  cropState.y=(CROP_BOX-cropState.baseH)/2;
+  const el=document.getElementById('crop-img');
+  el.src=img.src;
+  document.getElementById('crop-zoom').value=100;
+  document.getElementById('overlay-bijsnijden').classList.add('open');
+  updateCrop();
+}
+function updateCrop(){
+  cropState.scale=document.getElementById('crop-zoom').value/100;
+  begrensCrop();
+  const el=document.getElementById('crop-img');
+  const w=cropState.baseW*cropState.scale, h=cropState.baseH*cropState.scale;
+  el.style.width=w+'px'; el.style.height=h+'px';
+  el.style.left=cropState.x+'px'; el.style.top=cropState.y+'px';
+}
+function begrensCrop(){
+  const w=cropState.baseW*cropState.scale, h=cropState.baseH*cropState.scale;
+  if(cropState.x>0)cropState.x=0;
+  if(cropState.y>0)cropState.y=0;
+  if(cropState.x<CROP_BOX-w)cropState.x=CROP_BOX-w;
+  if(cropState.y<CROP_BOX-h)cropState.y=CROP_BOX-h;
+}
+(function initCropDrag(){
+  document.addEventListener('DOMContentLoaded',()=>{});
+  const start=e=>{const v=document.getElementById('crop-vak');if(!v||!document.getElementById('overlay-bijsnijden').classList.contains('open'))return;
+    if(!v.contains(e.target)&&e.target.id!=='crop-vak')return;
+    cropState.dragging=true;const p=punt(e);cropState.sx=p.x-cropState.x;cropState.sy=p.y-cropState.y;};
+  const move=e=>{if(!cropState.dragging)return;const p=punt(e);cropState.x=p.x-cropState.sx;cropState.y=p.y-cropState.sy;begrensCrop();
+    const el=document.getElementById('crop-img');el.style.left=cropState.x+'px';el.style.top=cropState.y+'px';e.preventDefault();};
+  const stop=()=>{cropState.dragging=false;};
+  function punt(e){const t=e.touches?e.touches[0]:e;return{x:t.clientX,y:t.clientY};}
+  document.addEventListener('mousedown',start);document.addEventListener('mousemove',move);document.addEventListener('mouseup',stop);
+  document.addEventListener('touchstart',start,{passive:false});document.addEventListener('touchmove',move,{passive:false});document.addEventListener('touchend',stop);
+})();
+function bewaarBijgesneden(){
+  const c=document.createElement('canvas');c.width=OPSLAG_GROOTTE;c.height=OPSLAG_GROOTTE;
+  const ctx=c.getContext('2d');
+  const f=OPSLAG_GROOTTE/CROP_BOX;
+  const w=cropState.baseW*cropState.scale, h=cropState.baseH*cropState.scale;
+  ctx.drawImage(cropState.img, cropState.x*f, cropState.y*f, w*f, h*f);
+  const data=c.toDataURL('image/jpeg',0.8);
+  const l=leden.find(x=>x.id===gekozenId);
+  if(l){l.foto=data;logHandeling('foto_geupload',l.id);}
+  sluitBijsnijden();tekenLeden();tekenDetail();
+  toon('&#9989; Foto bewaard');
+}
+function sluitBijsnijden(){document.getElementById('overlay-bijsnijden').classList.remove('open');}
+
+function openCam(){
+  document.getElementById('overlay-cam').classList.add('open');
+  document.getElementById('cam-video').style.display='block';
+  document.getElementById('cam-foto').style.display='none';
+  document.getElementById('cam-knip').style.display='inline-flex';
+  document.getElementById('cam-opnieuw').style.display='none';
+  document.getElementById('cam-bewaar').style.display='none';
+  navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}})
+    .then(s=>{camStream=s;document.getElementById('cam-video').srcObject=s;})
+    .catch(()=>{toon('&#9888;&#65039; Geen webcam gevonden of geen toestemming');});
+}
+function knipFoto(){
+  const v=document.getElementById('cam-video'),c=document.getElementById('cam-canvas');
+  const s=Math.min(v.videoWidth,v.videoHeight);
+  c.width=s;c.height=s;
+  c.getContext('2d').drawImage(v,(v.videoWidth-s)/2,(v.videoHeight-s)/2,s,s,0,0,s,s);
+  camFotoData=c.toDataURL('image/jpeg',0.8);
+  document.getElementById('cam-foto').src=camFotoData;
+  document.getElementById('cam-video').style.display='none';
+  document.getElementById('cam-foto').style.display='block';
+  document.getElementById('cam-knip').style.display='none';
+  document.getElementById('cam-opnieuw').style.display='inline-flex';
+  document.getElementById('cam-bewaar').style.display='inline-flex';
+}
+function opnieuwFoto(){
+  document.getElementById('cam-video').style.display='block';
+  document.getElementById('cam-foto').style.display='none';
+  document.getElementById('cam-knip').style.display='inline-flex';
+  document.getElementById('cam-opnieuw').style.display='none';
+  document.getElementById('cam-bewaar').style.display='none';
+}
+function bewaarFoto(){
+  const l=leden.find(x=>x.id===gekozenId);if(l&&camFotoData){l.foto=camFotoData;logHandeling('foto_gemaakt',l.id);}
+  sluitCam();tekenLeden();tekenDetail();toon('&#9989; Foto bewaard');
+}
+function sluitCam(){
+  if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null;}
+  document.getElementById('overlay-cam').classList.remove('open');
+}
+
+let nieuweQrCode=null;
+function openPrint(){
+  const l=leden.find(x=>x.id===gekozenId);if(!l)return;
+  // Genereer de NIEUWE code, maar pas hem nog niet toe (pas bij effectief printen).
+  nieuweQrCode="RY-"+Math.random().toString(16).slice(2,10);
+  document.getElementById('qr-naam').textContent=l.voornaam+' '+l.achternaam;
+  const t=document.getElementById('qr-target');t.innerHTML='';
+  new QRCode(t,{text:nieuweQrCode,width:96,height:96});
+  // Toon ter info de oude en de nieuwe code in het venster.
+  const info=document.getElementById('qr-codes-info');
+  if(info) info.innerHTML='Oude code: <b>'+(l.qr||'geen')+'</b> &#8594; Nieuwe code: <b>'+nieuweQrCode+'</b>';
+  document.getElementById('overlay-print').classList.add('open');
+}
+function sluitPrint(){
+  // Annuleren: nieuwe code vervalt, het bestaande kaartje blijft geldig.
+  nieuweQrCode=null;
+  document.getElementById('overlay-print').classList.remove('open');
+}
+function doePrint(){
+  const l=leden.find(x=>x.id===gekozenId);if(!l||!nieuweQrCode)return;
+  // NU pas de nieuwe code definitief toepassen: het oude kaartje wordt ongeldig.
+  l.qr=nieuweQrCode;
+  logHandeling('kaartje_geprint_oude_ongeldig',l.id);
+  window.print();
+  nieuweQrCode=null;
+  document.getElementById('overlay-print').classList.remove('open');
+  tekenDetail();
+  toon('&#128424;&#65039; Kaartje geprint &#8212; nieuwe code actief, oude is nu ongeldig');
+}
+
+werkAdminKnopBij();
+tekenLeden();
+</script>
+</body>
+</html>

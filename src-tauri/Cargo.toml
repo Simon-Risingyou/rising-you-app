@@ -1,0 +1,30 @@
+# ============================================================================
+# Rising You — Tauri (Rust) backend
+# ----------------------------------------------------------------------------
+# De Rust-laag is bewust dun: bijna alle logica zit in de database en de
+# frontend. Tauri zorgt hier vooral voor het desktopvenster, de auto-updater
+# (zodat jij op afstand kunt updaten) en veilige toegang tot het bestandssysteem.
+# ============================================================================
+[package]
+name = "rising-you-ledenbeheer"
+version = "0.1.0"
+description = "Ledenbeheer- en check-in-systeem voor Rising You VZW"
+authors = ["Rising You VZW"]
+edition = "2021"
+
+[lib]
+name = "rising_you_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+tauri = { version = "2.0", features = [] }
+tauri-plugin-updater = "2.0"
+tauri-plugin-shell = "2.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[features]
+custom-protocol = ["tauri/custom-protocol"]
