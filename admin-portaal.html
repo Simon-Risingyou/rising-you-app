@@ -102,7 +102,7 @@
     <a class="tab" href="ledenbeheer.html" id="tab-ledenbeheer">&#128100; Ledenbeheer</a>
     <a class="tab actief" href="admin-portaal.html">&#128273; Admin portaal</a>
   </div>
-  <div class="medewerker"><span class="sym">&#128273;</span><span>Admin: <b id="admin-naam">Lana</b></span>
+  <div class="medewerker"><span class="sym">&#128273;</span><span>Admin: <b id="admin-naam">&hellip;</b></span>
     <button class="knop knop-rood-omlijnd" style="font-size:14px;padding:8px 12px" onclick="adminUitloggen()"><span class="sym">&#128274;</span> Uitloggen</button>
   </div>
 </div>
@@ -270,8 +270,23 @@ import { alleClubsessies as dbAlleClubsessies, maakClubsessie as dbMaakClubsessi
          deactiveerMedewerker as dbDeactiveerMedewerker, zetAdminRechten as dbZetAdminRechten,
          zetAdminWachtwoord as dbZetAdminWachtwoord } from './src/lib/databron.js';
 
-// Tijdelijk: vaste medewerker (Lana, admin uit de testdata).
-const HUIDIGE_MEDEWERKER_ID = '00000000-0000-0000-0000-0000000000b1';
+// De ingelogde admin is de medewerker die op check-in/ledenbeheer gekozen was
+// bij "Wie werkt nu?" (gedeeld via sessionStorage, zie CLAUDE.md).
+function leesGekozenMedewerker(){
+  try{ return sessionStorage.getItem('ry_medewerker_id'); }catch(e){ return null; }
+}
+const HUIDIGE_MEDEWERKER_ID = leesGekozenMedewerker();
+
+// Toont de naam van de ingelogde admin bovenaan i.p.v. een hardgecodeerde naam.
+async function laadAdminNaam(){
+  const el=document.getElementById('admin-naam');
+  if(!el) return;
+  try{
+    const lijst = await dbAlleMedewerkers() || [];
+    const m = lijst.find(x=>x.id===HUIDIGE_MEDEWERKER_ID);
+    el.textContent = m ? m.voornaam : '(onbekend)';
+  }catch(e){ console.error('Admin-naam laden mislukte:',e); }
+}
 
 // Toegangscontrole: het admin portaal is enkel voor ingelogde admins.
 (function(){
@@ -736,6 +751,7 @@ function adminUitloggen(){
 }
 
 // Eerst de activiteitenlijst laden, dan de rest tekenen.
+laadAdminNaam();
 await laadActiviteitenLijst();
 laadSessies();      // sessies uit de database laden en tekenen
 laadWijzigingen();  // recente wijzigingen uit de database

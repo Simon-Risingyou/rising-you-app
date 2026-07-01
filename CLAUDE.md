@@ -165,14 +165,15 @@ Net afgerond en volledig werkend tegen de database:
 
 - **Medewerkersbeheer in het admin portaal**: tabblad "Medewerkers" (lijst, toevoegen, admin-rechten togglen, wachtwoord instellen, deactiveren, laatste-admin-bescherming) — gebouwd en op 2026-07-01 via headless-browser doorloop (Playwright, nu devDependency) getest: beide tabbladen tekenen correct, geen console-errors, alle acties + de laatste-actieve-admin-bescherming werken.
 - **Admin-login op persoonlijke wachtwoorden**: `index.html`/`ledenbeheer.html` gebruiken niet meer `DEMO_WACHTWOORD`; `doeAdminLogin()` is async en roept `checkAdminLogin()` (→ `fn_check_admin_login`) aan met de in de dropdown gekozen medewerker, met aparte foutmelding bij verbindingsproblemen. Bijkomende drift gevonden en opgelost: migratie 0006's opgeslagen tekst miste de `search_path`-fix die al live stond — vastgelegd in `0012_admin_login_search_path.sql`. Getest op 2026-07-01 via browser: oud demo-wachtwoord geweigerd, fout wachtwoord geweigerd, juist wachtwoord logt in (beide schermen), niet-admin kan het loginscherm niet openen.
+- **(2026-07-01)** `HUIDIGE_MEDEWERKER_ID` in `admin-portaal.html` gekoppeld aan de echt ingelogde admin: leest nu `sessionStorage('ry_medewerker_id')` (zelfde sleutel als check-in/ledenbeheer) i.p.v. hardgecodeerd Lana. De "Admin: X"-badge bovenaan toont nu ook de echte naam (via `fn_alle_medewerkers`, opgehaald in nieuwe functie `laadAdminNaam()`). Getest via browser: ingelogd als Sara (tijdelijk admin gemaakt voor de test, nadien teruggezet) toont de badge "Sara" en nieuwe logregels in "Recente wijzigingen" tonen "(door Sara Helper)" i.p.v. Lana.
 
 ### DIRECT OPENSTAAND — hier zijn we mee bezig
 
-1. **`HUIDIGE_MEDEWERKER_ID` in `admin-portaal.html` staat hardgecodeerd op Lana** (`...b1`) in plaats van de in de kassa/ledenbeheer gekozen medewerker over te nemen — logging in het admin-portaal registreert dus altijd Lana, niet de effectief ingelogde admin. Ontdekt tijdens het testen van medewerkersbeheer, nog niet opgelost.
+Geen — de drie items hierboven zijn afgerond. Volgende prioriteit is door de gebruiker gekozen, zie "DAARNA" hieronder.
 
 ### DAARNA (door gebruiker gekozen prioriteit)
-2. **Visuele kaart-editor** in het admin portaal: upload huisstijl-achtergrond, versleepbare QR- en naam-boxen, layout opslaan, toepassen bij het printen. Nu is het kaartontwerp hardgecodeerd in jsPDF (QR links ~34mm, naam rechts, tekst "Rising You — lidkaart"). Gebruiker koos expliciet voor een "volwaardige visuele editor".
-3. **Statistieksectie** (tab bestaat al als uitgeschakeld "Statistieken (later)"): anonieme aantallen op leeftijd, postcode, herkomst, deelnames per activiteit.
+1. **Visuele kaart-editor** in het admin portaal: upload huisstijl-achtergrond, versleepbare QR- en naam-boxen, layout opslaan, toepassen bij het printen. Nu is het kaartontwerp hardgecodeerd in jsPDF (QR links ~34mm, naam rechts, tekst "Rising You — lidkaart"). Gebruiker koos expliciet voor een "volwaardige visuele editor".
+2. **Statistieksectie** (tab bestaat al als uitgeschakeld "Statistieken (later)"): anonieme aantallen op leeftijd, postcode, herkomst, deelnames per activiteit.
 
 ### LATER / UITBREIDINGEN
 - Website-zelfregistratie op afgeschermd deel van risingyou.be (account aanmaken + eigen beurten/abonnement zien; nog geen digitaal beheer/betaling). Live sync met dezelfde database; vangnet als internet wegvalt.
