@@ -500,9 +500,16 @@ export async function bewaarKaartLayout(layout, medewerkerId) {
   return data;
 }
 
-// Anonieme aantallen (leeftijd, postcode, herkomst, deelnames per activiteit).
-export async function haalStatistieken() {
-  const { data, error } = await supabase.rpc('fn_statistieken');
+// Anonieme aantallen (tijdlijn, leeftijd, postcode, herkomst, deelnames per
+// activiteit), filterbaar op periode/activiteit/sessie en dag- of weekgroepering.
+export async function haalStatistieken(filters = {}) {
+  const { data, error } = await supabase.rpc('fn_statistieken', {
+    p_vanaf: filters.vanaf ?? null,
+    p_tot: filters.tot ?? null,
+    p_activiteit: filters.activiteit ?? null,
+    p_sessie_id: filters.sessieId ?? null,
+    p_groepering: filters.groepering ?? 'dag',
+  });
   if (error) throw error;
   return data;
 }

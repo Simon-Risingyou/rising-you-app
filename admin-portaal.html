@@ -242,6 +242,41 @@
     <div class="kaart">
       <h2><span class="sym">&#128202;</span> Statistieken</h2>
       <p style="font-size:14px;color:var(--grijs);margin-bottom:14px">Anonieme aantallen. Nooit gekoppeld aan een individueel lid &mdash; enkel groepstotalen, zoals vastgelegd in het GDPR-beleid.</p>
+
+      <!-- Slicers: gelden voor de hele pagina (chart + reeksen hieronder) -->
+      <div class="veld-rij" style="align-items:flex-end;margin-bottom:18px">
+        <div class="veld"><label>Periode</label>
+          <select id="stat-periode">
+            <option value="7">Laatste 7 dagen</option>
+            <option value="30">Laatste 30 dagen</option>
+            <option value="90">Laatste 90 dagen</option>
+            <option value="jaar">Dit jaar</option>
+            <option value="alles" selected>Alles</option>
+          </select>
+        </div>
+        <div class="veld"><label>Activiteit</label>
+          <select id="stat-activiteit-filter"><option value="">Alle activiteiten</option></select>
+        </div>
+        <div class="veld"><label>Sessie</label>
+          <select id="stat-sessie-filter"><option value="">Alle sessies</option></select>
+        </div>
+        <div class="veld" style="flex:0 0 auto"><label style="visibility:hidden">.</label>
+          <button class="knop knop-grijs" onclick="laadStatistieken()"><span class="sym">&#128260;</span> Vernieuwen</button></div>
+      </div>
+
+      <!-- Tijdlijn: check-ins per dag/week per activiteit -->
+      <div style="margin-bottom:24px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <h3 style="font-size:15px">Check-ins per dag/week, per activiteit</h3>
+          <div class="schakel">
+            <button id="stat-groep-dag" class="aan" onclick="statZetGroepering('dag')">Per dag</button>
+            <button id="stat-groep-week" onclick="statZetGroepering('week')">Per week</button>
+          </div>
+        </div>
+        <canvas id="stat-tijdlijn-canvas" width="900" height="260" style="width:100%;max-width:900px;height:260px"></canvas>
+        <div id="stat-tijdlijn-legende" style="display:flex;gap:14px;flex-wrap:wrap;margin-top:8px;font-size:13px"></div>
+      </div>
+
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px">
         <div>
           <h3 style="font-size:15px;margin-bottom:8px">Leeftijd</h3>
@@ -260,7 +295,6 @@
           <div id="stat-activiteiten"></div>
         </div>
       </div>
-      <button class="knop knop-grijs" style="margin-top:16px" onclick="laadStatistieken()"><span class="sym">&#128260;</span> Vernieuwen</button>
     </div>
   </div>
 </div>
@@ -927,19 +961,127 @@ function statTekenLijst(containerId, rijen){
   ).join('');
 }
 
+// Slicers: periode/activiteit/sessie (gelden voor chart + reeksen), dag/week
+// (geldt enkel voor de tijdlijn-chart).
+let statGroepering='dag';
+let statFilterOptiesGeladen=false;
+
+function statZetGroepering(g){
+  statGroepering=g;
+  document.getElementById('stat-groep-dag').classList.toggle('aan', g==='dag');
+  document.getElementById('stat-groep-week').classList.toggle('aan', g==='week');
+  laadStatistieken();
+}
+
+// Vult de activiteit/sessie-dropdowns eenmalig (niet bij elke herlaad, anders
+// verliest de gebruiker zijn/haar keuze).
+async function statLaadFilterOpties(){
+  if(statFilterOptiesGeladen) return;
+  try{
+    const [activiteitenLijst, sessiesLijst] = await Promise.all([dbAlleActiviteiten(), dbAlleClubsessies()]);
+    const actSel=document.getElementById('stat-activiteit-filter');
+    (activiteitenLijst||[]).forEach(a=>{
+      const opt=document.createElement('option'); opt.value=a.code; opt.textContent=a.naam;
+      actSel.appendChild(opt);
+    });
+    const sesSel=document.getElementById('stat-sessie-filter');
+    (Array.isArray(sessiesLijst)?sessiesLijst:[]).forEach(s=>{
+      const opt=document.createElement('option'); opt.value=s.id; opt.textContent=s.naam;
+      sesSel.appendChild(opt);
+    });
+    statFilterOptiesGeladen=true;
+  }catch(e){ console.error('Statistiek-filteropties laden mislukte:',e); }
+}
+
+function statDatumIso(d){ return d.toISOString().slice(0,10); }
+// Zet de periode-keuze (preset) om naar concrete vanaf/tot-datums.
+function statPeriodeNaarData(waarde){
+  const tot=new Date();
+  if(waarde==='alles') return {vanaf:null, tot:null};
+  if(waarde==='jaar') return {vanaf: statDatumIso(new Date(tot.getFullYear(),0,1)), tot: statDatumIso(tot)};
+  const vanaf=new Date(tot); vanaf.setDate(vanaf.getDate()-parseInt(waarde,10));
+  return {vanaf: statDatumIso(vanaf), tot: statDatumIso(tot)};
+}
+
+const STAT_KLEUREN=['#7c3aed','#2563eb','#10b981','#f59e0b','#ef4444','#06b6d4','#ec4899','#84cc16'];
+
+// Tekent de tijdlijn als een gestapelde staafgrafiek (canvas, geen chart-library).
+function statTekenTijdlijn(punten){
+  const canvas=document.getElementById('stat-tijdlijn-canvas');
+  const ctx=canvas.getContext('2d');
+  const W=canvas.width, H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  document.getElementById('stat-tijdlijn-legende').innerHTML='';
+  if(!Array.isArray(punten) || punten.length===0){
+    ctx.fillStyle='#9ca3af'; ctx.font='14px Arial'; ctx.textAlign='center';
+    ctx.fillText('Geen check-ins in deze periode/filter.', W/2, H/2);
+    return;
+  }
+  const periodes=[...new Map(punten.map(p=>[p.periode_sort, p.periode_label])).entries()]
+    .sort((a,b)=> a[0]<b[0]?-1:(a[0]>b[0]?1:0));
+  const activiteitenSet=[...new Set(punten.map(p=>p.activiteit))];
+  const perPeriode={};
+  periodes.forEach(([sort])=>{ perPeriode[sort]={}; });
+  punten.forEach(p=>{ perPeriode[p.periode_sort][p.activiteit]=p.aantal; });
+  const totalen=periodes.map(([sort])=>activiteitenSet.reduce((som,a)=>som+(perPeriode[sort][a]||0),0));
+  const maxTotaal=Math.max(...totalen, 1);
+
+  const marge={links:36, onder:34, boven:10, rechts:10};
+  const breedteGrafiek=W-marge.links-marge.rechts;
+  const hoogteGrafiek=H-marge.boven-marge.onder;
+  const stap=breedteGrafiek/periodes.length;
+  const barBreedte=Math.min(60, stap*0.65);
+
+  ctx.strokeStyle='#e5e7eb'; ctx.fillStyle='#9ca3af'; ctx.font='11px Arial'; ctx.textAlign='right';
+  for(let i=0;i<=4;i++){
+    const waarde=Math.round(maxTotaal*i/4);
+    const y=marge.boven+hoogteGrafiek-(hoogteGrafiek*i/4);
+    ctx.beginPath(); ctx.moveTo(marge.links,y); ctx.lineTo(W-marge.rechts,y); ctx.stroke();
+    ctx.fillText(String(waarde), marge.links-6, y+4);
+  }
+
+  ctx.textAlign='center';
+  periodes.forEach(([sort,label], i)=>{
+    let yOnder=marge.boven+hoogteGrafiek;
+    const x=marge.links+stap*i+(stap-barBreedte)/2;
+    activiteitenSet.forEach((act,ai)=>{
+      const aantal=perPeriode[sort][act]||0;
+      if(aantal<=0) return;
+      const h=hoogteGrafiek*(aantal/maxTotaal);
+      ctx.fillStyle=STAT_KLEUREN[ai%STAT_KLEUREN.length];
+      ctx.fillRect(x, yOnder-h, barBreedte, h);
+      yOnder-=h;
+    });
+    ctx.fillStyle='#6b7280';
+    ctx.fillText(label, x+barBreedte/2, H-marge.onder+16);
+  });
+
+  document.getElementById('stat-tijdlijn-legende').innerHTML=activiteitenSet.map((act,ai)=>
+    '<span style="display:inline-flex;align-items:center;gap:5px">'
+    +'<span style="width:11px;height:11px;border-radius:3px;background:'+STAT_KLEUREN[ai%STAT_KLEUREN.length]+';display:inline-block"></span>'+act+'</span>'
+  ).join('');
+}
+
 async function laadStatistieken(){
+  await statLaadFilterOpties();
   ['stat-leeftijd','stat-postcode','stat-herkomst','stat-activiteiten'].forEach(id=>{
     document.getElementById(id).innerHTML='<div class="leeg">Laden…</div>';
   });
+  const {vanaf,tot}=statPeriodeNaarData(document.getElementById('stat-periode').value);
+  const activiteit=document.getElementById('stat-activiteit-filter').value || null;
+  const sessieId=document.getElementById('stat-sessie-filter').value || null;
   let s;
   try{
-    s = await dbHaalStatistieken();
+    s = await dbHaalStatistieken({vanaf, tot, activiteit, sessieId, groepering: statGroepering});
   }catch(e){ console.error('Statistieken laden mislukte:',e); toon('&#9888;&#65039; Statistieken laden mislukte.'); return; }
+  statTekenTijdlijn(s.tijdlijn);
   statTekenLijst('stat-leeftijd', s.leeftijd);
   statTekenLijst('stat-postcode', s.postcode);
   statTekenLijst('stat-herkomst', s.herkomst);
   statTekenLijst('stat-activiteiten', s.activiteiten);
 }
+['stat-periode','stat-activiteit-filter','stat-sessie-filter'].forEach(id=>
+  document.getElementById(id).addEventListener('change', laadStatistieken));
 
 // ============ WIJZIGINGEN ============
 let wijzigingen=[];   // wordt uit de database geladen (fn_recente_wijzigingen)
@@ -1114,7 +1256,7 @@ Object.assign(window, {
   // kaartontwerp
   verwijderKaartAchtergrond, bewaarKaartLayoutDb,
   // statistieken
-  laadStatistieken,
+  laadStatistieken, statZetGroepering,
   // admin
   adminUitloggen,
 });
