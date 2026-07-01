@@ -87,6 +87,15 @@ export async function wijzigLid(lidId, velden, medewerkerId) {
   return data;
 }
 
+// Profielfoto instellen (data-URL) of verwijderen (null).
+export async function zetFoto(lidId, fotoData, medewerkerId) {
+  const { data, error } = await supabase.rpc('fn_zet_foto', {
+    p_lid_id: lidId, p_foto_data: fotoData, p_medewerker_id: medewerkerId,
+  });
+  if (error) throw error;
+  return data;
+}
+
 // Beurtenkaart opladen (activiteit + aantal; tarief null = tarief van het lid).
 export async function laadBeurtenkaart(lidId, aantal, activiteit, tarief, medewerkerId) {
   const { data, error } = await supabase.rpc('fn_laad_beurtenkaart', {

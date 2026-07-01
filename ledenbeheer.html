@@ -51,6 +51,7 @@
   .detail-kop{display:flex;gap:16px;align-items:center;margin-bottom:18px}
   .detail-avatar{width:96px;height:96px;border-radius:16px;background:#eceae3;display:flex;align-items:center;justify-content:center;font-size:42px;color:var(--grijs);flex-shrink:0;overflow:hidden;position:relative}
   .detail-avatar img{width:100%;height:100%;object-fit:cover}
+  .foto-wijzig-knop{position:absolute;right:-4px;bottom:-4px;width:30px;height:30px;border-radius:50%;background:var(--paars);color:#fff;border:2px solid var(--wit);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;padding:0}
   .detail-naam{font-size:24px;font-weight:700}
   .detail-sub{font-size:15px;color:var(--grijs);margin-top:2px}
   .sectie{margin-top:18px;padding-top:18px;border-top:2px solid var(--lijn)}
@@ -213,6 +214,52 @@
   </div>
 </div>
 
+<div class="overlay" id="overlay-fotokeuze">
+  <div class="modal" style="max-width:380px">
+    <h3><span class="sym">&#128247;</span> Profielfoto</h3>
+    <p style="font-size:15px;color:var(--grijs);margin-bottom:14px">Maak een foto met de webcam of kies een bestand van de computer.</p>
+    <button class="knop knop-blauw knop-groot" style="margin-bottom:10px" onclick="sluitFotoKeuze();openCam()"><span class="sym">&#128247;</span> Webcam gebruiken</button>
+    <button class="knop knop-blauw knop-groot" style="margin-bottom:10px" onclick="document.getElementById('foto-upload').click()"><span class="sym">&#128228;</span> Bestand kiezen</button>
+    <input type="file" id="foto-upload" accept="image/*" style="display:none" onchange="laadUpload(event)">
+    <button class="knop knop-grijs knop-groot" onclick="sluitFotoKeuze()">Annuleer</button>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-bijsnijden">
+  <div class="modal" style="max-width:420px">
+    <h3><span class="sym">&#9986;&#65039;</span> Foto bijsnijden</h3>
+    <p style="font-size:14px;color:var(--grijs);margin-bottom:12px">Sleep om te verschuiven. Gebruik de schuifbalk om in te zoomen. De foto wordt vierkant en verkleind opgeslagen.</p>
+    <div id="crop-vak" style="position:relative;width:300px;height:300px;margin:0 auto;border-radius:14px;overflow:hidden;background:#111;touch-action:none;cursor:move">
+      <img id="crop-img" style="position:absolute;transform-origin:0 0;user-select:none;pointer-events:none" alt="">
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;margin:12px 0">
+      <span class="sym">&#128270;</span>
+      <input type="range" id="crop-zoom" min="100" max="300" value="100" style="flex:1" oninput="updateCrop()">
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="knop knop-grijs" style="flex:1" onclick="sluitBijsnijden()">Annuleer</button>
+      <button class="knop knop-groen" style="flex:1" onclick="bewaarBijgesneden()"><span class="sym">&#10003;</span> Bewaren</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-cam">
+  <div class="modal">
+    <h3><span class="sym">&#128247;</span> Profielfoto maken</h3>
+    <div class="cam-wrap">
+      <video id="cam-video" autoplay playsinline></video>
+      <canvas id="cam-canvas" style="display:none"></canvas>
+      <img id="cam-foto" style="display:none" alt="Gemaakte foto">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center">
+        <button class="knop knop-blauw" id="cam-knip" onclick="knipFoto()"><span class="sym">&#128247;</span> Foto nemen</button>
+        <button class="knop knop-grijs" id="cam-opnieuw" onclick="opnieuwFoto()" style="display:none"><span class="sym">&#8635;</span> Opnieuw</button>
+        <button class="knop knop-groen" id="cam-bewaar" onclick="bewaarFoto()" style="display:none"><span class="sym">&#10003;</span> Bewaren</button>
+        <button class="knop knop-grijs" onclick="sluitCam()">Sluiten</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="overlay-print">
   <div class="modal" style="max-width:420px">
     <h3><span class="sym">&#128424;&#65039;</span> Kaartje</h3>
@@ -251,7 +298,8 @@ import { zoekLeden as dbZoekLeden, haalLid as dbHaalLid,
          annuleerBeurtenkaart as dbAnnuleerBeurtenkaart,
          annuleerAbonnement as dbAnnuleerAbonnement,
          trekBeurtenAf as dbTrekBeurtenAf,
-         zetAbonnementEinddatum as dbZetAbonnementEinddatum } from './src/lib/databron.js';
+         zetAbonnementEinddatum as dbZetAbonnementEinddatum,
+         zetFoto as dbZetFoto } from './src/lib/databron.js';
 
 // Tijdelijk: vaste medewerker (Sara uit de testdata), zoals in de check-in.
 // De medewerker die nu werkt. Gekozen via de dropdown, bewaard in sessionStorage
@@ -559,6 +607,142 @@ async function zetAbonnementEinddatumDb(){
   }catch(e){ console.error(e); toon('&#9888;&#65039; Aanpassen mislukte.'); }
 }
 
+// --- Profielfoto: webcam of upload, altijd bijgesneden naar een klein vierkant ---
+function openFotoKeuze(){document.getElementById('overlay-fotokeuze').classList.add('open');}
+function sluitFotoKeuze(){document.getElementById('overlay-fotokeuze').classList.remove('open');}
+async function verwijderFoto(){
+  if(!huidigLid || !huidigLid.foto_pad) return;
+  const ok = await vraagBevestiging('Foto van '+huidigLid.voornaam+' verwijderen?', 'Ja, verwijderen');
+  if(!ok) return;
+  try{
+    await dbZetFoto(huidigLid.id, null, HUIDIGE_MEDEWERKER_ID);
+    huidigLid = await dbHaalLid(huidigLid.id);
+    tekenLeden(); tekenDetail();
+    toon('&#128465;&#65039; Foto verwijderd');
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Verwijderen mislukte.'); }
+}
+
+let cropState={img:null,x:0,y:0,scale:1,baseW:0,baseH:0,dragging:false,sx:0,sy:0};
+const CROP_BOX=300;       // grootte van het bijsnijvak op het scherm
+const OPSLAG_GROOTTE=256; // uiteindelijke opgeslagen fotogrootte (klein maar duidelijk)
+let camStream=null, camFotoData=null;
+
+function laadUpload(ev){
+  const file=ev.target.files[0];
+  ev.target.value='';
+  if(!file)return;
+  sluitFotoKeuze();
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{ startBijsnijden(img); };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+function startBijsnijden(img){
+  cropState.img=img;
+  // schaal zodat de kortste zijde het vak vult
+  const ratio=Math.max(CROP_BOX/img.width, CROP_BOX/img.height);
+  cropState.baseW=img.width*ratio;
+  cropState.baseH=img.height*ratio;
+  cropState.scale=1;
+  cropState.x=(CROP_BOX-cropState.baseW)/2;
+  cropState.y=(CROP_BOX-cropState.baseH)/2;
+  const el=document.getElementById('crop-img');
+  el.src=img.src;
+  document.getElementById('crop-zoom').value=100;
+  document.getElementById('overlay-bijsnijden').classList.add('open');
+  updateCrop();
+}
+function updateCrop(){
+  cropState.scale=document.getElementById('crop-zoom').value/100;
+  begrensCrop();
+  const el=document.getElementById('crop-img');
+  const w=cropState.baseW*cropState.scale, h=cropState.baseH*cropState.scale;
+  el.style.width=w+'px'; el.style.height=h+'px';
+  el.style.left=cropState.x+'px'; el.style.top=cropState.y+'px';
+}
+function begrensCrop(){
+  const w=cropState.baseW*cropState.scale, h=cropState.baseH*cropState.scale;
+  if(cropState.x>0)cropState.x=0;
+  if(cropState.y>0)cropState.y=0;
+  if(cropState.x<CROP_BOX-w)cropState.x=CROP_BOX-w;
+  if(cropState.y<CROP_BOX-h)cropState.y=CROP_BOX-h;
+}
+(function initCropDrag(){
+  const start=e=>{const v=document.getElementById('crop-vak');if(!v||!document.getElementById('overlay-bijsnijden').classList.contains('open'))return;
+    if(!v.contains(e.target)&&e.target.id!=='crop-vak')return;
+    cropState.dragging=true;const p=punt(e);cropState.sx=p.x-cropState.x;cropState.sy=p.y-cropState.y;};
+  const move=e=>{if(!cropState.dragging)return;const p=punt(e);cropState.x=p.x-cropState.sx;cropState.y=p.y-cropState.sy;begrensCrop();
+    const el=document.getElementById('crop-img');el.style.left=cropState.x+'px';el.style.top=cropState.y+'px';e.preventDefault();};
+  const stop=()=>{cropState.dragging=false;};
+  function punt(e){const t=e.touches?e.touches[0]:e;return{x:t.clientX,y:t.clientY};}
+  document.addEventListener('mousedown',start);document.addEventListener('mousemove',move);document.addEventListener('mouseup',stop);
+  document.addEventListener('touchstart',start,{passive:false});document.addEventListener('touchmove',move,{passive:false});document.addEventListener('touchend',stop);
+})();
+async function bewaarBijgesneden(){
+  if(!huidigLid) return;
+  const c=document.createElement('canvas');c.width=OPSLAG_GROOTTE;c.height=OPSLAG_GROOTTE;
+  const ctx=c.getContext('2d');
+  const f=OPSLAG_GROOTTE/CROP_BOX;
+  const w=cropState.baseW*cropState.scale, h=cropState.baseH*cropState.scale;
+  ctx.drawImage(cropState.img, cropState.x*f, cropState.y*f, w*f, h*f);
+  const data=c.toDataURL('image/jpeg',0.8);
+  try{
+    await dbZetFoto(huidigLid.id, data, HUIDIGE_MEDEWERKER_ID);
+    huidigLid = await dbHaalLid(huidigLid.id);
+    sluitBijsnijden(); tekenLeden(); tekenDetail();
+    toon('&#9989; Foto bewaard');
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Foto bewaren mislukte.'); }
+}
+function sluitBijsnijden(){document.getElementById('overlay-bijsnijden').classList.remove('open');}
+
+function openCam(){
+  document.getElementById('overlay-cam').classList.add('open');
+  document.getElementById('cam-video').style.display='block';
+  document.getElementById('cam-foto').style.display='none';
+  document.getElementById('cam-knip').style.display='inline-flex';
+  document.getElementById('cam-opnieuw').style.display='none';
+  document.getElementById('cam-bewaar').style.display='none';
+  navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}})
+    .then(s=>{camStream=s;document.getElementById('cam-video').srcObject=s;})
+    .catch(()=>{toon('&#9888;&#65039; Geen webcam gevonden of geen toestemming');});
+}
+function knipFoto(){
+  const v=document.getElementById('cam-video'),c=document.getElementById('cam-canvas');
+  const s=Math.min(v.videoWidth,v.videoHeight);
+  c.width=s;c.height=s;
+  c.getContext('2d').drawImage(v,(v.videoWidth-s)/2,(v.videoHeight-s)/2,s,s,0,0,s,s);
+  camFotoData=c.toDataURL('image/jpeg',0.8);
+  document.getElementById('cam-foto').src=camFotoData;
+  document.getElementById('cam-video').style.display='none';
+  document.getElementById('cam-foto').style.display='block';
+  document.getElementById('cam-knip').style.display='none';
+  document.getElementById('cam-opnieuw').style.display='inline-flex';
+  document.getElementById('cam-bewaar').style.display='inline-flex';
+}
+function opnieuwFoto(){
+  document.getElementById('cam-video').style.display='block';
+  document.getElementById('cam-foto').style.display='none';
+  document.getElementById('cam-knip').style.display='inline-flex';
+  document.getElementById('cam-opnieuw').style.display='none';
+  document.getElementById('cam-bewaar').style.display='none';
+}
+async function bewaarFoto(){
+  if(!huidigLid || !camFotoData) return;
+  try{
+    await dbZetFoto(huidigLid.id, camFotoData, HUIDIGE_MEDEWERKER_ID);
+    huidigLid = await dbHaalLid(huidigLid.id);
+    sluitCam(); tekenLeden(); tekenDetail();
+    toon('&#9989; Foto bewaard');
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Foto bewaren mislukte.'); }
+}
+function sluitCam(){
+  if(camStream){camStream.getTracks().forEach(t=>t.stop());camStream=null;}
+  document.getElementById('overlay-cam').classList.remove('open');
+}
+
 // --- Gezin beheren (database) ---
 async function maakGezinDb(){
   if(!huidigLid) return;
@@ -659,9 +843,10 @@ function tekenDetail(){
 
   d.innerHTML=
    '<div class="detail-kop">'
-   +'<div class="detail-avatar">'+av+'</div>'
+   +'<div class="detail-avatar">'+av+'<button class="foto-wijzig-knop" onclick="openFotoKeuze()" title="Foto wijzigen"><span class="sym">&#128247;</span></button></div>'
    +'<div><div class="detail-naam">'+l.voornaam+' '+l.achternaam+'</div>'
    +'<div class="detail-sub">'+leeftijd+(l.sociaal_tarief?' &#183; sociaal tarief (A-Kaart)':'')+'</div>'
+   + (l.foto_pad?'<button class="mini-knop" style="margin-top:6px" onclick="verwijderFoto()"><span class="sym">&#128465;&#65039;</span> Foto verwijderen</button>':'')
    +'</div>'
    +'</div>'
 
@@ -959,6 +1144,10 @@ Object.assign(window, {
   annuleerLaatsteBeurtenkaart, annuleerLaatsteAbonnement, trekBeurtenAfDb, zetAbonnementEinddatumDb,
   // gezin beheren (database)
   maakGezinDb, haalUitGezinDb, zoekGezinKandidaten, voegLidAanGezinToe,
+  // profielfoto (database)
+  openFotoKeuze, sluitFotoKeuze, verwijderFoto, laadUpload,
+  updateCrop, bewaarBijgesneden, sluitBijsnijden,
+  openCam, knipFoto, opnieuwFoto, bewaarFoto, sluitCam,
   // medewerker / admin
   medewerkerGewijzigd, adminKnopActie, doeAdminLogin, sluitAdminLogin,
   // print
