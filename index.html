@@ -49,8 +49,6 @@
   .zoekrij{border:2px solid var(--lijn);border-radius:10px;padding:10px;display:flex;align-items:center;gap:10px}
   .zoekrij .nm{font-weight:600;flex:1}
   .zoekrij .st{font-size:13px;color:var(--grijs)}
-  .demo-rij{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
-  .demo-rij button{font-size:13px;padding:7px 10px;border:2px solid var(--lijn);background:var(--wit);border-radius:9px;cursor:pointer}
   .wachtlijst{display:flex;flex-direction:column;gap:11px;min-height:60px}
   .leeg{color:var(--grijs);text-align:center;padding:22px;font-size:15px}
   .wachtkaart{border:2px solid var(--lijn);border-radius:14px;padding:12px;display:flex;gap:11px;align-items:flex-start;background:var(--wit);position:relative}
@@ -170,7 +168,6 @@
     <h2><span class="sym">&#128247;</span> Inchecken</h2>
     <input class="scan-input" id="scaninput" placeholder="Scan kaartje&#8230;" autocomplete="off">
     <div class="uitleg">Scan de QR-code.<br>Het lid komt meteen in de wachtkamer.</div>
-    <div class="demo-rij" id="demorij"></div>
     <div class="blok">
       <h2 style="font-size:16px"><span class="sym">&#128269;</span> Klant opzoeken</h2>
       <div class="uitleg" style="text-align:left;margin:0 0 8px">Voor klanten zonder kaartje (bv. clubsessie).</div>
@@ -415,8 +412,6 @@ const ledenById={}; Object.entries(leden).forEach(([k,l])=>{l.sleutel=k; ledenBy
 let wachtId=0, nieuwTeller=0;
 let gepakteKaartId=null;   // welke wachtkaart is 'opgepakt' om te plaatsen (aantik-methode)
 const wachtenden={}, dagcheckins=[];
-const demorij=document.getElementById('demorij');
-Object.values(leden).forEach(l=>{const b=document.createElement('button');b.textContent=l.voornaam;b.onclick=()=>{const vensterOpen=document.querySelector('.overlay.open')!==null;verwerkScanCode(l.sleutel,vensterOpen);};demorij.appendChild(b);});
 // ===========================================================================
 // GLOBALE SCAN-ONDERSCHEPPING
 // Een USB-handscanner 'typt' de code zeer snel + Enter. We luisteren op het
