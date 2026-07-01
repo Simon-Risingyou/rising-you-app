@@ -21,6 +21,11 @@ export default defineConfig({
   envPrefix: ['VITE_', 'TAURI_'],
   build: {
     outDir: 'dist',
+    // Deze app draait uitsluitend in Tauri's eigen (moderne) WebView2, nooit
+    // in willekeurige browsers — dus mag het build-target de nieuwste
+    // syntax (o.a. top-level await in de opstartcode van elk scherm) gewoon
+    // laten staan i.p.v. te transpileren naar oudere browsers.
+    target: 'esnext',
     // Elk scherm is een eigen ingang.
     rollupOptions: {
       input: {
