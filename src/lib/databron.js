@@ -490,7 +490,9 @@ export async function bewaarKaartLayout(layout, medewerkerId) {
     p_naam_x: layout.naam_x,
     p_naam_y: layout.naam_y,
     p_naam_lettergrootte: layout.naam_lettergrootte,
+    p_naam_breedte: layout.naam_breedte,
     p_ondertitel: layout.ondertitel,
+    p_ondertitel_x: layout.ondertitel_x,
     p_ondertitel_y: layout.ondertitel_y,
     p_medewerker_id: medewerkerId,
   });

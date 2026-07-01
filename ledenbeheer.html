@@ -1405,8 +1405,8 @@ async function doePrint(){
   catch(e){ console.error('Kaartontwerp laden mislukte, val terug op standaardontwerp:',e); layout=null; }
   layout = Object.assign({
     achtergrond_data:null, qr_x:8, qr_y:10, qr_grootte:34,
-    naam_x:48, naam_y:26, naam_lettergrootte:15,
-    ondertitel:'Rising You \u2014 lidkaart', ondertitel_y:33,
+    naam_x:48, naam_y:26, naam_lettergrootte:15, naam_breedte:33,
+    ondertitel:'Rising You \u2014 lidkaart', ondertitel_x:48, ondertitel_y:33,
   }, layout || {});
 
   // jsPDF: kaart van 85 x 54 mm (standaard visitekaartje), liggend.
@@ -1420,14 +1420,14 @@ async function doePrint(){
   // QR-box.
   doc.addImage(qrData, 'PNG', layout.qr_x, layout.qr_y, layout.qr_grootte, layout.qr_grootte);
 
-  // Naam + ondertitel.
+  // Naam + ondertitel (los positioneerbaar).
   doc.setFont('helvetica','bold'); doc.setFontSize(layout.naam_lettergrootte);
   doc.setTextColor(40,40,40);
-  doc.text(huidigLid.voornaam+' '+huidigLid.achternaam, layout.naam_x, layout.naam_y, { maxWidth: 85-layout.naam_x-4 });
+  doc.text(huidigLid.voornaam+' '+huidigLid.achternaam, layout.naam_x, layout.naam_y, { maxWidth: layout.naam_breedte });
   if(layout.ondertitel){
     doc.setFont('helvetica','normal'); doc.setFontSize(9);
     doc.setTextColor(120,120,120);
-    doc.text(layout.ondertitel, layout.naam_x, layout.ondertitel_y);
+    doc.text(layout.ondertitel, layout.ondertitel_x, layout.ondertitel_y);
   }
 
   // Open de PDF in een verborgen iframe en roep de printdialoog op.

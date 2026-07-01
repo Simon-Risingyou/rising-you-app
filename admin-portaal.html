@@ -190,17 +190,23 @@
   <div class="paneel" id="paneel-kaartontwerp">
     <div class="kaart">
       <h2><span class="sym">&#128179;</span> Kaartontwerp</h2>
-      <p style="font-size:14px;color:var(--grijs);margin-bottom:14px">Zo ziet het lidkaartje eruit dat geprint wordt (85 &times; 54 mm, liggend). Sleep de QR- of naam-box, of gebruik de velden voor een exacte positie.</p>
+      <p style="font-size:14px;color:var(--grijs);margin-bottom:14px">Zo ziet het lidkaartje eruit dat geprint wordt (85 &times; 54 mm, liggend). Sleep een vak om te verplaatsen, of het handvat rechtsonder/rechts om het te vergroten &mdash; of gebruik de velden voor een exacte waarde.</p>
       <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
         <div>
           <div id="ko-canvas" style="position:relative;width:425px;height:270px;border:2px solid var(--lijn);border-radius:8px;overflow:hidden;background:#f4f4f4;background-size:cover;background-position:center">
-            <div id="ko-box-qr" style="position:absolute;box-sizing:border-box;border:2px dashed var(--paars);background:rgba(124,58,237,.10);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--paars);cursor:move;user-select:none;touch-action:none">QR</div>
+            <div id="ko-box-qr" style="position:absolute;box-sizing:border-box;border:2px dashed var(--paars);background:rgba(124,58,237,.10);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--paars);cursor:move;user-select:none;touch-action:none">
+              QR
+              <div id="ko-handvat-qr" style="position:absolute;right:-2px;bottom:-2px;width:12px;height:12px;background:var(--paars);border-radius:3px 0 3px 0;cursor:nwse-resize;touch-action:none"></div>
+            </div>
             <div id="ko-box-naam" style="position:absolute;box-sizing:border-box;border:2px dashed var(--blauw, #2563eb);background:rgba(37,99,235,.08);display:flex;flex-direction:column;justify-content:center;padding:4px 6px;overflow:hidden;cursor:move;user-select:none;touch-action:none">
               <b id="ko-naam-preview" style="line-height:1.15;color:#282828">Voornaam Achternaam</b>
-              <span id="ko-ondertitel-preview" style="font-size:9px;color:#787878;margin-top:2px">Rising You &mdash; lidkaart</span>
+              <div id="ko-handvat-naam" style="position:absolute;right:-2px;top:0;bottom:0;width:8px;background:var(--blauw, #2563eb);cursor:ew-resize;touch-action:none"></div>
+            </div>
+            <div id="ko-box-ondertitel" style="position:absolute;box-sizing:border-box;border:2px dashed var(--groen);background:rgba(16,185,129,.10);display:flex;align-items:center;padding:2px 6px;overflow:hidden;cursor:move;user-select:none;touch-action:none">
+              <span id="ko-ondertitel-preview" style="font-size:9px;color:#787878">Rising You &mdash; lidkaart</span>
             </div>
           </div>
-          <p style="font-size:12px;color:var(--grijs);margin-top:8px;max-width:425px">Dit is een schaalmodel (5px per mm), geen exacte printvoorbeeld van lettertype/QR-inhoud.</p>
+          <p style="font-size:12px;color:var(--grijs);margin-top:8px;max-width:425px">Dit is een schaalmodel (5px per mm), geen exacte printvoorbeeld van lettertype/QR-inhoud. Paars = QR, blauw = naam, groen = ondertitel.</p>
         </div>
         <div style="flex:1;min-width:280px">
           <div class="veld"><label>Achtergrondafbeelding (optioneel)</label>
@@ -218,7 +224,11 @@
             <div class="veld"><label>Naam &mdash; lettergrootte</label><input type="number" id="ko-naam-lettergrootte" step="0.5"></div>
           </div>
           <div class="veld-rij">
+            <div class="veld"><label>Naam &mdash; breedte (mm)</label><input type="number" id="ko-naam-breedte" step="0.5"></div>
+          </div>
+          <div class="veld-rij">
             <div class="veld" style="flex:2"><label>Ondertitel-tekst</label><input id="ko-ondertitel"></div>
+            <div class="veld"><label>Ondertitel &mdash; x (mm)</label><input type="number" id="ko-ondertitel-x" step="0.5"></div>
             <div class="veld"><label>Ondertitel &mdash; y (mm)</label><input type="number" id="ko-ondertitel-y" step="0.5"></div>
           </div>
           <button class="knop knop-paars" style="margin-top:8px" onclick="bewaarKaartLayoutDb()"><span class="sym">&#10003;</span> Kaartontwerp opslaan</button>
@@ -667,8 +677,8 @@ async function laadKaartOntwerp(){
   // Standaardwaarden als er (nog) niets bewaard is.
   koLayout = Object.assign({
     achtergrond_data:null, qr_x:8, qr_y:10, qr_grootte:34,
-    naam_x:48, naam_y:26, naam_lettergrootte:15,
-    ondertitel:'Rising You — lidkaart', ondertitel_y:33,
+    naam_x:48, naam_y:26, naam_lettergrootte:15, naam_breedte:33,
+    ondertitel:'Rising You — lidkaart', ondertitel_x:48, ondertitel_y:33,
   }, koLayout);
 
   document.getElementById('ko-qr-x').value=koLayout.qr_x;
@@ -677,7 +687,9 @@ async function laadKaartOntwerp(){
   document.getElementById('ko-naam-x').value=koLayout.naam_x;
   document.getElementById('ko-naam-y').value=koLayout.naam_y;
   document.getElementById('ko-naam-lettergrootte').value=koLayout.naam_lettergrootte;
+  document.getElementById('ko-naam-breedte').value=koLayout.naam_breedte;
   document.getElementById('ko-ondertitel').value=koLayout.ondertitel;
+  document.getElementById('ko-ondertitel-x').value=koLayout.ondertitel_x;
   document.getElementById('ko-ondertitel-y').value=koLayout.ondertitel_y;
 
   const canvas=document.getElementById('ko-canvas');
@@ -686,11 +698,36 @@ async function laadKaartOntwerp(){
   koTekenBoxenVanuitLayout();
 }
 
+// Schat het aantal regels dat 'tekst' nodig heeft bij woordafbreking op
+// 'breedtePx' (zelfde principe als jsPDF's tekstterugloop) — enkel voor de
+// preview, zodat zichtbaar is of een groter lettertype nog past.
+let koMeetCanvas=null;
+function koMeetTekstBreedte(tekst, pxFontSize){
+  if(!koMeetCanvas) koMeetCanvas=document.createElement('canvas');
+  const ctx=koMeetCanvas.getContext('2d');
+  ctx.font='bold '+pxFontSize+'px Arial';
+  return ctx.measureText(tekst).width;
+}
+function koSchatRegels(tekst, breedtePx, pxFontSize){
+  if(!tekst) return 1;
+  const woorden=tekst.split(' ');
+  let regels=1, huidig='';
+  woorden.forEach(w=>{
+    const test=huidig?huidig+' '+w:w;
+    if(koMeetTekstBreedte(test,pxFontSize)>breedtePx && huidig){ regels++; huidig=w; }
+    else huidig=test;
+  });
+  return regels;
+}
+
 // Zet de box-posities/groottes (px) op basis van koLayout (mm).
+// -16/-10: doc.text()'s y is de tekstbasislijn, de box toont er iets boven (visuele benadering).
+const KO_NAAM_Y_OFFSET=16, KO_ONDERTITEL_Y_OFFSET=10;
 function koTekenBoxenVanuitLayout(){
   const canvas=document.getElementById('ko-canvas');
   const qr=document.getElementById('ko-box-qr');
   const naam=document.getElementById('ko-box-naam');
+  const ondertitel=document.getElementById('ko-box-ondertitel');
 
   const qrPx = koLayout.qr_grootte*KO_PX_PER_MM;
   qr.style.left=(koLayout.qr_x*KO_PX_PER_MM)+'px';
@@ -699,10 +736,21 @@ function koTekenBoxenVanuitLayout(){
   qr.style.height=qrPx+'px';
 
   const naamLeft=koLayout.naam_x*KO_PX_PER_MM;
+  const naamBreedtePx=Math.max(20, Math.min(koLayout.naam_breedte*KO_PX_PER_MM, canvas.clientWidth-naamLeft-4));
+  const naamFontPx=Math.round(koLayout.naam_lettergrootte*1.15);
   naam.style.left=naamLeft+'px';
-  naam.style.top=(koLayout.naam_y*KO_PX_PER_MM-16)+'px'; // -16: doc.text() y is de tekstbasislijn, box toont er iets boven
-  naam.style.width=Math.max(40, canvas.clientWidth-naamLeft-8)+'px';
-  naam.style.height='46px';
+  naam.style.top=(koLayout.naam_y*KO_PX_PER_MM-KO_NAAM_Y_OFFSET)+'px';
+  naam.style.width=naamBreedtePx+'px';
+  // Hoogte schaalt mee met lettergrootte + geschat aantal regels (woordafbreking-
+  // benadering), zodat zichtbaar wordt of de naam nog in de breedte past.
+  const naamRegels=koSchatRegels('Voornaam Achternaam', naamBreedtePx-8, naamFontPx);
+  naam.style.height=Math.max(30, naamRegels*naamFontPx*1.25+14)+'px';
+
+  const ondertitelLeft=koLayout.ondertitel_x*KO_PX_PER_MM;
+  ondertitel.style.left=ondertitelLeft+'px';
+  ondertitel.style.top=(koLayout.ondertitel_y*KO_PX_PER_MM-KO_ONDERTITEL_Y_OFFSET)+'px';
+  ondertitel.style.width=Math.max(20, canvas.clientWidth-ondertitelLeft-4)+'px';
+  ondertitel.style.height='20px';
 
   document.getElementById('ko-naam-preview').style.fontSize=Math.round(koLayout.naam_lettergrootte*1.15)+'px';
   document.getElementById('ko-ondertitel-preview').textContent=koLayout.ondertitel;
@@ -716,14 +764,15 @@ function koVeldenGewijzigd(){
   koLayout.naam_x=parseFloat(document.getElementById('ko-naam-x').value)||0;
   koLayout.naam_y=parseFloat(document.getElementById('ko-naam-y').value)||0;
   koLayout.naam_lettergrootte=parseFloat(document.getElementById('ko-naam-lettergrootte').value)||1;
+  koLayout.naam_breedte=parseFloat(document.getElementById('ko-naam-breedte').value)||1;
   koLayout.ondertitel=document.getElementById('ko-ondertitel').value;
+  koLayout.ondertitel_x=parseFloat(document.getElementById('ko-ondertitel-x').value)||0;
   koLayout.ondertitel_y=parseFloat(document.getElementById('ko-ondertitel-y').value)||0;
   koTekenBoxenVanuitLayout();
 }
 
 // Na het slepen: box-pixelpositie terugrekenen naar mm en de velden bijwerken.
 function koBoxNaarVelden(welke){
-  const canvas=document.getElementById('ko-canvas');
   const el=document.getElementById('ko-box-'+welke);
   const links=parseFloat(el.style.left)/KO_PX_PER_MM;
   const boven=parseFloat(el.style.top)/KO_PX_PER_MM;
@@ -731,11 +780,16 @@ function koBoxNaarVelden(welke){
     koLayout.qr_x=Math.round(links*10)/10; koLayout.qr_y=Math.round(boven*10)/10;
     document.getElementById('ko-qr-x').value=koLayout.qr_x;
     document.getElementById('ko-qr-y').value=koLayout.qr_y;
-  } else {
+  } else if(welke==='naam'){
     koLayout.naam_x=Math.round(links*10)/10;
-    koLayout.naam_y=Math.round((boven+16/KO_PX_PER_MM)*10)/10; // +16px-equivalent: omgekeerde van de -16 hierboven
+    koLayout.naam_y=Math.round((boven+KO_NAAM_Y_OFFSET/KO_PX_PER_MM)*10)/10;
     document.getElementById('ko-naam-x').value=koLayout.naam_x;
     document.getElementById('ko-naam-y').value=koLayout.naam_y;
+  } else {
+    koLayout.ondertitel_x=Math.round(links*10)/10;
+    koLayout.ondertitel_y=Math.round((boven+KO_ONDERTITEL_Y_OFFSET/KO_PX_PER_MM)*10)/10;
+    document.getElementById('ko-ondertitel-x').value=koLayout.ondertitel_x;
+    document.getElementById('ko-ondertitel-y').value=koLayout.ondertitel_y;
   }
 }
 
@@ -766,7 +820,42 @@ function koMaakSleepbaar(boxEl, welke){
 }
 koMaakSleepbaar(document.getElementById('ko-box-qr'), 'qr');
 koMaakSleepbaar(document.getElementById('ko-box-naam'), 'naam');
-['ko-qr-x','ko-qr-y','ko-qr-grootte','ko-naam-x','ko-naam-y','ko-naam-lettergrootte','ko-ondertitel','ko-ondertitel-y']
+koMaakSleepbaar(document.getElementById('ko-box-ondertitel'), 'ondertitel');
+
+// Vergroot-logica (resize-handvat) op basis van pointer-events. e.stopPropagation()
+// voorkomt dat het handvat ook de sleep-logica van de ouder-box triggert.
+function koMaakVergrootbaar(handvatEl, welke){
+  let bezig=false, startX=0, startY=0, startGrootte=0, startBreedte=0;
+  handvatEl.addEventListener('pointerdown', e=>{
+    e.stopPropagation();
+    bezig=true;
+    try{ handvatEl.setPointerCapture(e.pointerId); }catch(err){}
+    startX=e.clientX; startY=e.clientY;
+    startGrootte=koLayout.qr_grootte; startBreedte=koLayout.naam_breedte;
+  });
+  handvatEl.addEventListener('pointermove', e=>{
+    if(!bezig) return;
+    e.stopPropagation();
+    if(welke==='qr'){
+      const deltaPx=Math.max(e.clientX-startX, e.clientY-startY);
+      koLayout.qr_grootte=Math.max(10, Math.min(80, Math.round((startGrootte+deltaPx/KO_PX_PER_MM)*10)/10));
+      document.getElementById('ko-qr-grootte').value=koLayout.qr_grootte;
+    } else {
+      const deltaPx=e.clientX-startX;
+      koLayout.naam_breedte=Math.max(10, Math.min(85, Math.round((startBreedte+deltaPx/KO_PX_PER_MM)*10)/10));
+      document.getElementById('ko-naam-breedte').value=koLayout.naam_breedte;
+    }
+    koTekenBoxenVanuitLayout();
+  });
+  const stop=e=>{ if(!bezig)return; e.stopPropagation(); bezig=false; try{handvatEl.releasePointerCapture(e.pointerId);}catch(err){} };
+  handvatEl.addEventListener('pointerup', stop);
+  handvatEl.addEventListener('pointercancel', stop);
+}
+koMaakVergrootbaar(document.getElementById('ko-handvat-qr'), 'qr');
+koMaakVergrootbaar(document.getElementById('ko-handvat-naam'), 'naam');
+
+['ko-qr-x','ko-qr-y','ko-qr-grootte','ko-naam-x','ko-naam-y','ko-naam-lettergrootte','ko-naam-breedte',
+ 'ko-ondertitel','ko-ondertitel-x','ko-ondertitel-y']
   .forEach(id=>document.getElementById(id).addEventListener('input', koVeldenGewijzigd));
 
 document.getElementById('ko-achtergrond-input').addEventListener('change', e=>{
