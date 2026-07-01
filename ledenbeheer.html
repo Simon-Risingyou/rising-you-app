@@ -316,11 +316,21 @@
         <button class="mini-knop" onclick="annuleerLaatsteAbonnement()"><span class="sym">&#8617;&#65039;</span> Ongedaan maken</button>
       </div>
     </div>
-    <div id="tg-aftrek-blok" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid var(--lijn)">
-      <div style="font-weight:600;font-size:14px;margin-bottom:6px">Beurten aftrekken <span style="font-weight:400;color:var(--grijs);font-size:12px">(admin)</span></div>
-      <div class="veld-rij" style="align-items:flex-end">
-        <div class="veld" style="margin-bottom:0"><label>Aantal beurten</label><input id="tg-aftrek-aantal" type="number" min="1" value="1"></div>
-        <div class="veld" style="flex:0 0 auto;margin-bottom:0"><button class="knop knop-rood-omlijnd" style="white-space:nowrap" onclick="trekBeurtenAfDb()"><span class="sym">&#10134;</span> Aftrekken</button></div>
+    <div id="tg-admin-blok" style="display:none">
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--lijn)">
+        <div style="font-weight:600;font-size:14px;margin-bottom:6px">Beurten aftrekken <span style="font-weight:400;color:var(--grijs);font-size:12px">(admin)</span></div>
+        <div class="veld-rij" style="align-items:flex-end">
+          <div class="veld" style="margin-bottom:0"><label>Aantal beurten</label><input id="tg-aftrek-aantal" type="number" min="1" value="1"></div>
+          <div class="veld" style="flex:0 0 auto;margin-bottom:0"><button class="knop knop-rood-omlijnd" style="white-space:nowrap" onclick="trekBeurtenAfDb()"><span class="sym">&#10134;</span> Aftrekken</button></div>
+        </div>
+      </div>
+      <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--lijn)">
+        <div style="font-weight:600;font-size:14px;margin-bottom:6px">Abonnement einddatum aanpassen <span style="font-weight:400;color:var(--grijs);font-size:12px">(admin)</span></div>
+        <div id="tg-abo-geen-lopend" style="font-size:13px;color:var(--grijs);display:none">Geen lopend abonnement voor deze activiteit.</div>
+        <div class="veld-rij" id="tg-abo-einddatum-rij" style="align-items:flex-end">
+          <div class="veld" style="margin-bottom:0"><label>Nieuwe einddatum</label><input id="tg-abo-einddatum" type="date"></div>
+          <div class="veld" style="flex:0 0 auto;margin-bottom:0"><button class="knop knop-rood-omlijnd" style="white-space:nowrap" onclick="zetAbonnementEinddatumDb()"><span class="sym">&#9999;&#65039;</span> Aanpassen</button></div>
+        </div>
       </div>
     </div>
     <div style="font-size:12px;color:var(--grijs);margin-top:8px">Het tarief volgt automatisch het tarieftype van het lid (<span id="tg-tarief-info">?</span>).</div>
@@ -365,7 +375,8 @@ import { zoekLeden as dbZoekLeden, haalLid as dbHaalLid,
          haalKaartLayout as dbHaalKaartLayout,
          annuleerBeurtenkaart as dbAnnuleerBeurtenkaart,
          annuleerAbonnement as dbAnnuleerAbonnement,
-         trekBeurtenAf as dbTrekBeurtenAf } from './src/lib/databron.js';
+         trekBeurtenAf as dbTrekBeurtenAf,
+         zetAbonnementEinddatum as dbZetAbonnementEinddatum } from './src/lib/databron.js';
 
 // Tijdelijk: vaste medewerker (Sara uit de testdata), zoals in de check-in.
 // De medewerker die nu werkt. Gekozen via de dropdown, bewaard in sessionStorage
@@ -611,12 +622,33 @@ function openTegoedModal(){
   document.getElementById('tg-tarief-info').textContent = huidigLid.tarieftype_effectief || '?';
   beurtenkaartStapel=[]; abonnementStapel=[];
   tgWerkOngedaanKnopBij();
-  document.getElementById('tg-aftrek-blok').style.display = isAdmin() ? 'block' : 'none';
+  document.getElementById('tg-admin-blok').style.display = isAdmin() ? 'block' : 'none';
+  tgVulAboEinddatum();
   document.getElementById('overlay-tegoed').classList.add('open');
 }
 function sluitTegoedModal(){
   document.getElementById('overlay-tegoed').classList.remove('open');
 }
+
+// Vult (admin) het einddatum-veld met de huidige einddatum van het lopende
+// abonnement voor de gekozen activiteit, of toont "geen lopend abonnement".
+function tgVulAboEinddatum(){
+  if(!huidigLid) return;
+  const act=document.getElementById('tg-activiteit').value;
+  const vandaag=new Date().toISOString().slice(0,10);
+  const lopend=(huidigLid.abonnementen||[])
+    .filter(a=>a.activiteit===act && a.actief!==false && a.eind_datum>=vandaag)
+    .sort((a,b)=> a.eind_datum<b.eind_datum?1:-1)[0];
+  const rij=document.getElementById('tg-abo-einddatum-rij');
+  const geen=document.getElementById('tg-abo-geen-lopend');
+  if(lopend){
+    document.getElementById('tg-abo-einddatum').value=lopend.eind_datum;
+    rij.style.display='flex'; geen.style.display='none';
+  } else {
+    rij.style.display='none'; geen.style.display='block';
+  }
+}
+document.getElementById('tg-activiteit').addEventListener('change', tgVulAboEinddatum);
 
 async function voegBeurtenkaartToe(){
   if(!huidigLid) return;
@@ -692,6 +724,23 @@ async function trekBeurtenAfDb(){
     huidigLid = await dbHaalLid(huidigLid.id);
     tekenLeden(); tekenDetail();
   }catch(e){ console.error(e); toon('&#9888;&#65039; Aftrekken mislukte.'); }
+}
+
+// Einddatum van het lopende abonnement manueel aanpassen — enkel zichtbaar/
+// bruikbaar in admin-modus.
+async function zetAbonnementEinddatumDb(){
+  if(!huidigLid) return;
+  const act=document.getElementById('tg-activiteit').value;
+  const nieuweDatum=document.getElementById('tg-abo-einddatum').value;
+  if(!nieuweDatum){ toon('&#9888;&#65039; Kies een datum.'); return; }
+  try{
+    const r = await dbZetAbonnementEinddatum(huidigLid.id, act, nieuweDatum, HUIDIGE_MEDEWERKER_ID);
+    if(r && r!=='ok'){ toon('&#9888;&#65039; '+r); return; }
+    toon('&#9999;&#65039; Einddatum abonnement '+activiteitNaam(act)+' aangepast');
+    huidigLid = await dbHaalLid(huidigLid.id);
+    tekenLeden(); tekenDetail();
+    tgVulAboEinddatum();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Aanpassen mislukte.'); }
 }
 
 // --- Gezin beheren (database) ---
@@ -1580,7 +1629,7 @@ Object.assign(window, {
   // bewerken (database)
   bewaarGegevensDb, zetTariefDb, toggleSociaalDb,
   voegBeurtenkaartToe, voegAbonnementToe, openTegoedModal, sluitTegoedModal,
-  annuleerLaatsteBeurtenkaart, annuleerLaatsteAbonnement, trekBeurtenAfDb,
+  annuleerLaatsteBeurtenkaart, annuleerLaatsteAbonnement, trekBeurtenAfDb, zetAbonnementEinddatumDb,
   // gezin beheren (database)
   maakGezinDb, haalUitGezinDb, zoekGezinKandidaten, voegLidAanGezinToe,
   // medewerker / admin

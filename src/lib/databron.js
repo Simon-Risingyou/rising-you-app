@@ -120,6 +120,15 @@ export async function trekBeurtenAf(lidId, activiteit, aantal, medewerkerId) {
   return data;
 }
 
+// Einddatum van het lopende abonnement handmatig aanpassen (admin, UI-gated).
+export async function zetAbonnementEinddatum(lidId, activiteit, nieuweEinddatum, medewerkerId) {
+  const { data, error } = await supabase.rpc('fn_zet_abonnement_einddatum', {
+    p_lid_id: lidId, p_activiteit: activiteit, p_nieuwe_einddatum: nieuweEinddatum, p_medewerker_id: medewerkerId,
+  });
+  if (error) throw error;
+  return data;
+}
+
 // Nieuw QR-kaartje aanmaken (failsafe: maakt oude kaartjes ongeldig). Geeft het
 // nieuwe qr_token terug.
 export async function nieuwKaartje(lidId, medewerkerId) {
