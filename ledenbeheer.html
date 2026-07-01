@@ -292,17 +292,23 @@
     <div class="veld"><label>Activiteit</label>
       <select id="tg-activiteit" style="width:100%;padding:9px;border:1px solid var(--lijn);border-radius:8px;font-size:15px"></select>
     </div>
-    <div class="veld-rij" style="margin-top:10px">
-      <div class="veld"><label>Beurtenkaart: aantal beurten</label><input id="tg-aantal" type="number" min="1" value="10"></div>
-      <div class="veld" style="flex:0 0 auto"><label style="visibility:hidden">.</label><button class="knop knop-blauw" style="white-space:nowrap" onclick="voegBeurtenkaartToe()"><span class="sym">&#10133;</span> Voeg beurtenkaart toe</button></div>
-    </div>
-    <div class="veld-rij" style="margin-top:12px">
-      <div class="veld"><label>Abonnement: duur</label>
-        <select id="tg-duur" style="width:100%;padding:9px;border:1px solid var(--lijn);border-radius:8px;font-size:15px">
-          <option value="3_maanden">3 maanden</option><option value="6_maanden">6 maanden</option><option value="12_maanden">12 maanden</option>
-        </select>
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--lijn)">
+      <div style="font-weight:600;font-size:14px;margin-bottom:6px">Beurtenkaart</div>
+      <div class="veld-rij" style="align-items:flex-end">
+        <div class="veld" style="margin-bottom:0"><label>Aantal beurten</label><input id="tg-aantal" type="number" min="1" value="10"></div>
+        <div class="veld" style="flex:0 0 auto;margin-bottom:0"><button class="knop knop-blauw" style="white-space:nowrap" onclick="voegBeurtenkaartToe()"><span class="sym">&#10133;</span> Toevoegen</button></div>
       </div>
-      <div class="veld" style="flex:0 0 auto"><label style="visibility:hidden">.</label><button class="knop knop-blauw" style="white-space:nowrap" onclick="voegAbonnementToe()"><span class="sym">&#10133;</span> Voeg abonnement toe</button></div>
+    </div>
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--lijn)">
+      <div style="font-weight:600;font-size:14px;margin-bottom:6px">Abonnement</div>
+      <div class="veld-rij" style="align-items:flex-end">
+        <div class="veld" style="margin-bottom:0"><label>Duur</label>
+          <select id="tg-duur" style="width:100%;padding:9px;border:1px solid var(--lijn);border-radius:8px;font-size:15px">
+            <option value="3_maanden">3 maanden</option><option value="6_maanden">6 maanden</option><option value="12_maanden">12 maanden</option>
+          </select>
+        </div>
+        <div class="veld" style="flex:0 0 auto;margin-bottom:0"><button class="knop knop-blauw" style="white-space:nowrap" onclick="voegAbonnementToe()"><span class="sym">&#10133;</span> Toevoegen</button></div>
+      </div>
     </div>
     <div style="font-size:12px;color:var(--grijs);margin-top:8px">Het tarief volgt automatisch het tarieftype van het lid (<span id="tg-tarief-info">?</span>).</div>
     <button class="knop knop-grijs" style="width:100%;margin-top:16px" onclick="sluitTegoedModal()">Sluiten</button>
