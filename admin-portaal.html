@@ -115,7 +115,7 @@
     <button class="subtab" id="st-activiteiten" onclick="toonPaneel('activiteiten')"><span class="sym">&#127919;</span> Activiteiten</button>
     <button class="subtab" id="st-medewerkers" onclick="toonPaneel('medewerkers')"><span class="sym">&#128101;</span> Medewerkers</button>
     <button class="subtab" id="st-kaartontwerp" onclick="toonPaneel('kaartontwerp')"><span class="sym">&#128179;</span> Kaartontwerp</button>
-    <button class="subtab" disabled style="opacity:.5;cursor:not-allowed"><span class="sym">&#128202;</span> Statistieken (later)</button>
+    <button class="subtab" id="st-statistieken" onclick="toonPaneel('statistieken')"><span class="sym">&#128202;</span> Statistieken</button>
   </div>
 
   <!-- PANEEL: SESSIES -->
@@ -236,6 +236,33 @@
       </div>
     </div>
   </div>
+
+  <!-- PANEEL: STATISTIEKEN -->
+  <div class="paneel" id="paneel-statistieken">
+    <div class="kaart">
+      <h2><span class="sym">&#128202;</span> Statistieken</h2>
+      <p style="font-size:14px;color:var(--grijs);margin-bottom:14px">Anonieme aantallen. Nooit gekoppeld aan een individueel lid &mdash; enkel groepstotalen, zoals vastgelegd in het GDPR-beleid.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px">
+        <div>
+          <h3 style="font-size:15px;margin-bottom:8px">Leeftijd</h3>
+          <div id="stat-leeftijd"></div>
+        </div>
+        <div>
+          <h3 style="font-size:15px;margin-bottom:8px">Postcode</h3>
+          <div id="stat-postcode"></div>
+        </div>
+        <div>
+          <h3 style="font-size:15px;margin-bottom:8px">Herkomst</h3>
+          <div id="stat-herkomst"></div>
+        </div>
+        <div>
+          <h3 style="font-size:15px;margin-bottom:8px">Deelnames per activiteit</h3>
+          <div id="stat-activiteiten"></div>
+        </div>
+      </div>
+      <button class="knop knop-grijs" style="margin-top:16px" onclick="laadStatistieken()"><span class="sym">&#128260;</span> Vernieuwen</button>
+    </div>
+  </div>
 </div>
 
 <!-- Modal: sessie aanmaken/bewerken -->
@@ -322,7 +349,8 @@ import { alleClubsessies as dbAlleClubsessies, maakClubsessie as dbMaakClubsessi
          deactiveerMedewerker as dbDeactiveerMedewerker, zetAdminRechten as dbZetAdminRechten,
          zetAdminWachtwoord as dbZetAdminWachtwoord,
          haalKaartLayout as dbHaalKaartLayout,
-         bewaarKaartLayout as dbBewaarKaartLayout } from './src/lib/databron.js';
+         bewaarKaartLayout as dbBewaarKaartLayout,
+         haalStatistieken as dbHaalStatistieken } from './src/lib/databron.js';
 
 // De ingelogde admin is de medewerker die op check-in/ledenbeheer gekozen was
 // bij "Wie werkt nu?" (gedeeld via sessionStorage, zie CLAUDE.md).
@@ -404,7 +432,7 @@ function bevestigNee(){
 }
 
 function toonPaneel(naam){
-  ['sessies','wijzigingen','accounts','activiteiten','medewerkers','kaartontwerp'].forEach(p=>{
+  ['sessies','wijzigingen','accounts','activiteiten','medewerkers','kaartontwerp','statistieken'].forEach(p=>{
     document.getElementById('paneel-'+p).classList.toggle('actief',p===naam);
     document.getElementById('st-'+p).classList.toggle('actief',p===naam);
   });
@@ -413,6 +441,7 @@ function toonPaneel(naam){
   if(naam==='accounts') laadAccounts();
   if(naam==='medewerkers') laadMedewerkersBeheer();
   if(naam==='kaartontwerp') laadKaartOntwerp();
+  if(naam==='statistieken') laadStatistieken();
 }
 
 // ============ SESSIES ============
@@ -881,6 +910,37 @@ async function bewaarKaartLayoutDb(){
   }catch(e){ console.error(e); toon('&#9888;&#65039; Opslaan mislukte.'); }
 }
 
+// ============ STATISTIEKEN (anonieme aantallen) ============
+// Tekent een lijstje met label + aantal + een proportionele balk (t.o.v. het
+// hoogste aantal in de reeks). Geen losse chart-library nodig.
+function statTekenLijst(containerId, rijen){
+  const box=document.getElementById(containerId);
+  if(!Array.isArray(rijen) || rijen.length===0){ box.innerHTML='<div class="leeg">Geen gegevens.</div>'; return; }
+  const max=Math.max(...rijen.map(r=>r.aantal), 1);
+  box.innerHTML=rijen.map(r=>
+    '<div style="margin-bottom:8px">'
+    +'<div style="display:flex;justify-content:space-between;font-size:13px;margin-bottom:2px">'
+    +'<span>'+r.label+'</span><b>'+r.aantal+'</b></div>'
+    +'<div style="background:var(--bg);border-radius:6px;height:8px;overflow:hidden">'
+    +'<div style="width:'+Math.round(r.aantal/max*100)+'%;height:100%;background:var(--paars)"></div></div>'
+    +'</div>'
+  ).join('');
+}
+
+async function laadStatistieken(){
+  ['stat-leeftijd','stat-postcode','stat-herkomst','stat-activiteiten'].forEach(id=>{
+    document.getElementById(id).innerHTML='<div class="leeg">Laden…</div>';
+  });
+  let s;
+  try{
+    s = await dbHaalStatistieken();
+  }catch(e){ console.error('Statistieken laden mislukte:',e); toon('&#9888;&#65039; Statistieken laden mislukte.'); return; }
+  statTekenLijst('stat-leeftijd', s.leeftijd);
+  statTekenLijst('stat-postcode', s.postcode);
+  statTekenLijst('stat-herkomst', s.herkomst);
+  statTekenLijst('stat-activiteiten', s.activiteiten);
+}
+
 // ============ WIJZIGINGEN ============
 let wijzigingen=[];   // wordt uit de database geladen (fn_recente_wijzigingen)
 
@@ -1053,6 +1113,8 @@ Object.assign(window, {
   openWachtwoord, sluitWachtwoord, bewaarWachtwoord,
   // kaartontwerp
   verwijderKaartAchtergrond, bewaarKaartLayoutDb,
+  // statistieken
+  laadStatistieken,
   // admin
   adminUitloggen,
 });

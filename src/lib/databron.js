@@ -499,3 +499,10 @@ export async function bewaarKaartLayout(layout, medewerkerId) {
   if (error) throw error;
   return data;
 }
+
+// Anonieme aantallen (leeftijd, postcode, herkomst, deelnames per activiteit).
+export async function haalStatistieken() {
+  const { data, error } = await supabase.rpc('fn_statistieken');
+  if (error) throw error;
+  return data;
+}
