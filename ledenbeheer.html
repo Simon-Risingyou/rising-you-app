@@ -298,6 +298,9 @@
         <div class="veld" style="margin-bottom:0"><label>Aantal beurten</label><input id="tg-aantal" type="number" min="1" value="10"></div>
         <div class="veld" style="flex:0 0 auto;margin-bottom:0"><button class="knop knop-blauw" style="white-space:nowrap" onclick="voegBeurtenkaartToe()"><span class="sym">&#10133;</span> Toevoegen</button></div>
       </div>
+      <div id="tg-beurten-ongedaan" style="display:none;margin-top:6px">
+        <button class="mini-knop" onclick="annuleerLaatsteBeurtenkaart()"><span class="sym">&#8617;&#65039;</span> Ongedaan maken</button>
+      </div>
     </div>
     <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--lijn)">
       <div style="font-weight:600;font-size:14px;margin-bottom:6px">Abonnement</div>
@@ -308,6 +311,16 @@
           </select>
         </div>
         <div class="veld" style="flex:0 0 auto;margin-bottom:0"><button class="knop knop-blauw" style="white-space:nowrap" onclick="voegAbonnementToe()"><span class="sym">&#10133;</span> Toevoegen</button></div>
+      </div>
+      <div id="tg-abo-ongedaan" style="display:none;margin-top:6px">
+        <button class="mini-knop" onclick="annuleerLaatsteAbonnement()"><span class="sym">&#8617;&#65039;</span> Ongedaan maken</button>
+      </div>
+    </div>
+    <div id="tg-aftrek-blok" style="display:none;margin-top:14px;padding-top:12px;border-top:1px solid var(--lijn)">
+      <div style="font-weight:600;font-size:14px;margin-bottom:6px">Beurten aftrekken <span style="font-weight:400;color:var(--grijs);font-size:12px">(admin)</span></div>
+      <div class="veld-rij" style="align-items:flex-end">
+        <div class="veld" style="margin-bottom:0"><label>Aantal beurten</label><input id="tg-aftrek-aantal" type="number" min="1" value="1"></div>
+        <div class="veld" style="flex:0 0 auto;margin-bottom:0"><button class="knop knop-rood-omlijnd" style="white-space:nowrap" onclick="trekBeurtenAfDb()"><span class="sym">&#10134;</span> Aftrekken</button></div>
       </div>
     </div>
     <div style="font-size:12px;color:var(--grijs);margin-top:8px">Het tarief volgt automatisch het tarieftype van het lid (<span id="tg-tarief-info">?</span>).</div>
@@ -349,7 +362,10 @@ import { zoekLeden as dbZoekLeden, haalLid as dbHaalLid,
          alleActiviteiten as dbAlleActiviteiten,
          actieveMedewerkers as dbActieveMedewerkers,
          checkAdminLogin as dbCheckAdminLogin,
-         haalKaartLayout as dbHaalKaartLayout } from './src/lib/databron.js';
+         haalKaartLayout as dbHaalKaartLayout,
+         annuleerBeurtenkaart as dbAnnuleerBeurtenkaart,
+         annuleerAbonnement as dbAnnuleerAbonnement,
+         trekBeurtenAf as dbTrekBeurtenAf } from './src/lib/databron.js';
 
 // Tijdelijk: vaste medewerker (Sara uit de testdata), zoals in de check-in.
 // De medewerker die nu werkt. Gekozen via de dropdown, bewaard in sessionStorage
@@ -569,12 +585,21 @@ async function toggleSociaalDb(){
 
 // Opent het "Tegoed toevoegen"-scherm (beurtenkaart + abonnement in één modal
 // i.p.v. een altijd-zichtbaar blok, om het overzicht compacter te houden).
+// Onthoudt de zonet aangemaakte kaart/abonnement zodat "Ongedaan maken" enkel
+// die ene, net toegevoegde rij weer verwijdert (niet een willekeurige oudere).
+let laatsteBeurtenkaartId=null, laatsteAbonnementId=null;
+
 function openTegoedModal(){
   if(!huidigLid) return;
   document.getElementById('tg-activiteit').innerHTML =
     ACTIVITEITEN.filter(a=>!a.gratis).map(a=>'<option value="'+a.code+'">'+a.naam+'</option>').join('');
   document.getElementById('tg-aantal').value=10;
+  document.getElementById('tg-aftrek-aantal').value=1;
   document.getElementById('tg-tarief-info').textContent = huidigLid.tarieftype_effectief || '?';
+  laatsteBeurtenkaartId=null; laatsteAbonnementId=null;
+  document.getElementById('tg-beurten-ongedaan').style.display='none';
+  document.getElementById('tg-abo-ongedaan').style.display='none';
+  document.getElementById('tg-aftrek-blok').style.display = isAdmin() ? 'block' : 'none';
   document.getElementById('overlay-tegoed').classList.add('open');
 }
 function sluitTegoedModal(){
@@ -588,8 +613,9 @@ async function voegBeurtenkaartToe(){
   if(!aantal || aantal<1){ toon('&#9888;&#65039; Geef een geldig aantal beurten.'); return; }
   try{
     // tarief null => database gebruikt het tarieftype van het lid
-    await dbLaadBeurtenkaart(huidigLid.id, aantal, act, null, HUIDIGE_MEDEWERKER_ID);
+    laatsteBeurtenkaartId = await dbLaadBeurtenkaart(huidigLid.id, aantal, act, null, HUIDIGE_MEDEWERKER_ID);
     toon('&#10003; Beurtenkaart toegevoegd: '+aantal+' '+activiteitNaam(act));
+    document.getElementById('tg-beurten-ongedaan').style.display='block';
     huidigLid = await dbHaalLid(huidigLid.id);
     tekenLeden(); tekenDetail();
   }catch(e){ console.error(e); toon('&#9888;&#65039; Toevoegen mislukte.'); }
@@ -601,11 +627,54 @@ async function voegAbonnementToe(){
   const duur=document.getElementById('tg-duur').value;
   const vandaag=new Date().toISOString().slice(0,10);
   try{
-    await dbLaadAbonnement(huidigLid.id, duur, vandaag, act, null, HUIDIGE_MEDEWERKER_ID);
+    laatsteAbonnementId = await dbLaadAbonnement(huidigLid.id, duur, vandaag, act, null, HUIDIGE_MEDEWERKER_ID);
     toon('&#10003; Abonnement toegevoegd: '+activiteitNaam(act));
+    document.getElementById('tg-abo-ongedaan').style.display='block';
     huidigLid = await dbHaalLid(huidigLid.id);
     tekenLeden(); tekenDetail();
   }catch(e){ console.error(e); toon('&#9888;&#65039; Toevoegen mislukte.'); }
+}
+
+// "Ongedaan maken": beschikbaar voor elke medewerker, enkel voor de zonet
+// zelf toegevoegde kaart/abonnement in deze modal-sessie.
+async function annuleerLaatsteBeurtenkaart(){
+  if(!huidigLid || !laatsteBeurtenkaartId) return;
+  try{
+    const r = await dbAnnuleerBeurtenkaart(laatsteBeurtenkaartId, HUIDIGE_MEDEWERKER_ID);
+    if(r && r!=='ok'){ toon('&#9888;&#65039; '+r); return; }
+    toon('&#8617;&#65039; Beurtenkaart ongedaan gemaakt');
+    laatsteBeurtenkaartId=null;
+    document.getElementById('tg-beurten-ongedaan').style.display='none';
+    huidigLid = await dbHaalLid(huidigLid.id);
+    tekenLeden(); tekenDetail();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Ongedaan maken mislukte.'); }
+}
+async function annuleerLaatsteAbonnement(){
+  if(!huidigLid || !laatsteAbonnementId) return;
+  try{
+    const r = await dbAnnuleerAbonnement(laatsteAbonnementId, HUIDIGE_MEDEWERKER_ID);
+    if(r && r!=='ok'){ toon('&#9888;&#65039; '+r); return; }
+    toon('&#8617;&#65039; Abonnement ongedaan gemaakt');
+    laatsteAbonnementId=null;
+    document.getElementById('tg-abo-ongedaan').style.display='none';
+    huidigLid = await dbHaalLid(huidigLid.id);
+    tekenLeden(); tekenDetail();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Ongedaan maken mislukte.'); }
+}
+
+// Handmatig beurten aftrekken — enkel zichtbaar/bruikbaar in admin-modus.
+async function trekBeurtenAfDb(){
+  if(!huidigLid) return;
+  const act=document.getElementById('tg-activiteit').value;
+  const aantal=parseInt(document.getElementById('tg-aftrek-aantal').value,10);
+  if(!aantal || aantal<1){ toon('&#9888;&#65039; Geef een geldig aantal beurten.'); return; }
+  try{
+    const r = await dbTrekBeurtenAf(huidigLid.id, act, aantal, HUIDIGE_MEDEWERKER_ID);
+    if(r && r!=='ok'){ toon('&#9888;&#65039; '+r); return; }
+    toon('&#10134; '+aantal+' beurten '+activiteitNaam(act)+' afgetrokken');
+    huidigLid = await dbHaalLid(huidigLid.id);
+    tekenLeden(); tekenDetail();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Aftrekken mislukte.'); }
 }
 
 // --- Gezin beheren (database) ---
@@ -1494,6 +1563,7 @@ Object.assign(window, {
   // bewerken (database)
   bewaarGegevensDb, zetTariefDb, toggleSociaalDb,
   voegBeurtenkaartToe, voegAbonnementToe, openTegoedModal, sluitTegoedModal,
+  annuleerLaatsteBeurtenkaart, annuleerLaatsteAbonnement, trekBeurtenAfDb,
   // gezin beheren (database)
   maakGezinDb, haalUitGezinDb, zoekGezinKandidaten, voegLidAanGezinToe,
   // medewerker / admin

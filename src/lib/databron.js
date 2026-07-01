@@ -94,6 +94,32 @@ export async function laadAbonnement(lidId, duur, startDatum, activiteit, tarief
   return data;
 }
 
+// Maakt het net toevoegen van een beurtenkaart/abonnement ongedaan (elke medewerker).
+export async function annuleerBeurtenkaart(beurtenkaartId, medewerkerId) {
+  const { data, error } = await supabase.rpc('fn_annuleer_beurtenkaart', {
+    p_beurtenkaart_id: beurtenkaartId, p_medewerker_id: medewerkerId,
+  });
+  if (error) throw error;
+  return data;
+}
+
+export async function annuleerAbonnement(abonnementId, medewerkerId) {
+  const { data, error } = await supabase.rpc('fn_annuleer_abonnement', {
+    p_abonnement_id: abonnementId, p_medewerker_id: medewerkerId,
+  });
+  if (error) throw error;
+  return data;
+}
+
+// Handmatig beurten aftrekken (admin, UI-gated).
+export async function trekBeurtenAf(lidId, activiteit, aantal, medewerkerId) {
+  const { data, error } = await supabase.rpc('fn_trek_beurten_af', {
+    p_lid_id: lidId, p_activiteit: activiteit, p_aantal: aantal, p_medewerker_id: medewerkerId,
+  });
+  if (error) throw error;
+  return data;
+}
+
 // Nieuw QR-kaartje aanmaken (failsafe: maakt oude kaartjes ongeldig). Geeft het
 // nieuwe qr_token terug.
 export async function nieuwKaartje(lidId, medewerkerId) {
