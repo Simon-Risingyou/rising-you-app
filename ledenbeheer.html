@@ -286,6 +286,29 @@
   </div>
 </div>
 
+<div class="overlay" id="overlay-tegoed">
+  <div class="modal" style="max-width:420px">
+    <h3><span class="sym">&#127903;&#65039;</span> Tegoed toevoegen</h3>
+    <div class="veld"><label>Activiteit</label>
+      <select id="tg-activiteit" style="width:100%;padding:9px;border:1px solid var(--lijn);border-radius:8px;font-size:15px"></select>
+    </div>
+    <div class="veld-rij" style="margin-top:10px">
+      <div class="veld"><label>Beurtenkaart: aantal beurten</label><input id="tg-aantal" type="number" min="1" value="10"></div>
+      <div class="veld" style="flex:0 0 auto"><label style="visibility:hidden">.</label><button class="knop knop-blauw" style="white-space:nowrap" onclick="voegBeurtenkaartToe()"><span class="sym">&#10133;</span> Voeg beurtenkaart toe</button></div>
+    </div>
+    <div class="veld-rij" style="margin-top:12px">
+      <div class="veld"><label>Abonnement: duur</label>
+        <select id="tg-duur" style="width:100%;padding:9px;border:1px solid var(--lijn);border-radius:8px;font-size:15px">
+          <option value="3_maanden">3 maanden</option><option value="6_maanden">6 maanden</option><option value="12_maanden">12 maanden</option>
+        </select>
+      </div>
+      <div class="veld" style="flex:0 0 auto"><label style="visibility:hidden">.</label><button class="knop knop-blauw" style="white-space:nowrap" onclick="voegAbonnementToe()"><span class="sym">&#10133;</span> Voeg abonnement toe</button></div>
+    </div>
+    <div style="font-size:12px;color:var(--grijs);margin-top:8px">Het tarief volgt automatisch het tarieftype van het lid (<span id="tg-tarief-info">?</span>).</div>
+    <button class="knop knop-grijs" style="width:100%;margin-top:16px" onclick="sluitTegoedModal()">Sluiten</button>
+  </div>
+</div>
+
 <div class="overlay" id="overlay-print">
   <div class="modal" style="max-width:420px">
     <h3><span class="sym">&#128424;&#65039;</span> Kaartje</h3>
@@ -538,6 +561,20 @@ async function toggleSociaalDb(){
   }catch(e){ console.error(e); toon('&#9888;&#65039; Wijzigen mislukte.'); }
 }
 
+// Opent het "Tegoed toevoegen"-scherm (beurtenkaart + abonnement in één modal
+// i.p.v. een altijd-zichtbaar blok, om het overzicht compacter te houden).
+function openTegoedModal(){
+  if(!huidigLid) return;
+  document.getElementById('tg-activiteit').innerHTML =
+    ACTIVITEITEN.filter(a=>!a.gratis).map(a=>'<option value="'+a.code+'">'+a.naam+'</option>').join('');
+  document.getElementById('tg-aantal').value=10;
+  document.getElementById('tg-tarief-info').textContent = huidigLid.tarieftype_effectief || '?';
+  document.getElementById('overlay-tegoed').classList.add('open');
+}
+function sluitTegoedModal(){
+  document.getElementById('overlay-tegoed').classList.remove('open');
+}
+
 async function voegBeurtenkaartToe(){
   if(!huidigLid) return;
   const act=document.getElementById('tg-activiteit').value;
@@ -694,22 +731,7 @@ function tekenDetail(){
 
    +'<div class="sectie"><h3><span class="sym">&#127903;&#65039;</span> Tegoed</h3>'
    + tegoedHtml
-   +'<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--lijn)">'
-   +'<div class="veld"><label>Activiteit</label>'
-   +'<select id="tg-activiteit" style="width:100%;padding:9px;border:1px solid var(--lijn);border-radius:8px;font-size:15px">'
-   + ACTIVITEITEN.filter(a=>!a.gratis).map(a=>'<option value="'+a.code+'">'+a.naam+'</option>').join('')
-   +'</select></div>'
-   +'<div class="veld-rij" style="margin-top:10px">'
-   +'<div class="veld"><label>Beurtenkaart: aantal beurten</label><input id="tg-aantal" type="number" min="1" value="10"></div>'
-   +'<div class="veld" style="flex:0 0 auto"><label style="visibility:hidden">.</label><button class="knop knop-blauw" style="white-space:nowrap" onclick="voegBeurtenkaartToe()"><span class="sym">&#10133;</span> Voeg beurtenkaart toe</button></div></div>'
-   +'<div class="veld-rij" style="margin-top:12px">'
-   +'<div class="veld"><label>Abonnement: duur</label>'
-   +'<select id="tg-duur" style="width:100%;padding:9px;border:1px solid var(--lijn);border-radius:8px;font-size:15px">'
-   +'<option value="3_maanden">3 maanden</option><option value="6_maanden">6 maanden</option><option value="12_maanden">12 maanden</option>'
-   +'</select></div>'
-   +'<div class="veld" style="flex:0 0 auto"><label style="visibility:hidden">.</label><button class="knop knop-blauw" style="white-space:nowrap" onclick="voegAbonnementToe()"><span class="sym">&#10133;</span> Voeg abonnement toe</button></div></div>'
-   +'<div style="font-size:12px;color:var(--grijs);margin-top:8px">Het tarief volgt automatisch het tarieftype van het lid ('+(l.tarieftype_effectief||'?')+').</div>'
-   +'</div>'
+   +'<button class="knop knop-blauw knop-groot" style="margin-top:14px" onclick="openTegoedModal()"><span class="sym">&#10133;</span> Tegoed toevoegen</button>'
    +'</div>'
 
    +'<div class="sectie"><h3><span class="sym">&#128179;</span> Kaartje</h3>'
@@ -1465,7 +1487,7 @@ Object.assign(window, {
   vraagBevestiging, bevestigJa, bevestigNee,
   // bewerken (database)
   bewaarGegevensDb, zetTariefDb, toggleSociaalDb,
-  voegBeurtenkaartToe, voegAbonnementToe,
+  voegBeurtenkaartToe, voegAbonnementToe, openTegoedModal, sluitTegoedModal,
   // gezin beheren (database)
   maakGezinDb, haalUitGezinDb, zoekGezinKandidaten, voegLidAanGezinToe,
   // medewerker / admin
