@@ -158,12 +158,13 @@ Net afgerond en volledig werkend tegen de database:
 - Medewerker-selectie gekoppeld; logging registreert de juiste medewerker; admin-rechten via `is_admin`.
 - pgcrypto aan; `fn_zet_admin_wachtwoord` en `fn_check_admin_login` werken (Lana heeft een wachtwoord).
 - **(2026-07-01)** DB-drift opgelost: migratie `0011_baseline_live_functies.sql` gepusht, repo en live database lopen weer gelijk (zie "Database-werkwijze" hierboven).
+- **(2026-07-01)** Medewerkersbeheer getest en werkend bevonden (zie item 1 hieronder, nu afgevinkt).
 
 ### DIRECT OPENSTAAND — hier zijn we mee bezig
 
-1. **[NET GEBOUWD, MOET NOG GETEST] Medewerkersbeheer in het admin portaal.** Nieuw tabblad "Medewerkers": lijst, toevoegen (voornaam/achternaam/admin-switch), admin-rechten togglen, wachtwoord instellen (popup), deactiveren. Beschermt de laatste actieve admin. databron-functies toegevoegd: `alleMedewerkers`, `maakMedewerker`, `deactiveerMedewerker`, `zetAdminRechten`, `zetAdminWachtwoord`, `checkAdminLogin`.
-   - **Bug die net is opgelost**: bij het toevoegen van het medewerkers-paneel was per ongeluk het volledige `paneel-activiteiten` overschreven, waardoor Activiteiten én Medewerkers een leeg scherm gaven (`toonPaneel` crashte op het ontbrekende element). Het activiteiten-paneel is teruggezet. Geverifieerd dat alle 5 panelen (`sessies, wijzigingen, accounts, activiteiten, medewerkers`) en bijbehorende `st-`tabs nu bestaan.
-   - **TE DOEN**: in de app testen dat beide tabbladen weer tekenen, en dat toevoegen/deactiveren/admin-togglen/wachtwoord-instellen werkt. De laatste-admin-bescherming testen (mag niet lukken).
+1. **[GETEST, WERKT] Medewerkersbeheer in het admin portaal.** Tabblad "Medewerkers": lijst, toevoegen (voornaam/achternaam/admin-switch), admin-rechten togglen, wachtwoord instellen (popup), deactiveren. Beschermt de laatste actieve admin. databron-functies: `alleMedewerkers`, `maakMedewerker`, `deactiveerMedewerker`, `zetAdminRechten`, `zetAdminWachtwoord`, `checkAdminLogin`.
+   - **Getest (2026-07-01) via een headless-browser doorloop** (Playwright, nu als devDependency in `package.json` voor toekomstige UI-tests) van `npm run dev`: beide tabbladen (Activiteiten, Medewerkers) tekenen correct, geen console-errors. Toevoegen, admin-rechten aan/uit, wachtwoord instellen, en deactiveren werken allemaal. De laatste-actieve-admin-bescherming blokkeert correct zowel het uitzetten van admin-rechten als het deactiveren, met een duidelijke Nederlandse foutmelding.
+   - Let op: `HUIDIGE_MEDEWERKER_ID` in `admin-portaal.html` staat nog hardgecodeerd op Lana (`...b1`) in plaats van de in de kassa/ledenbeheer gekozen medewerker over te nemen — logging in het admin-portaal registreert dus altijd Lana, niet de effectief ingelogde admin. Nog niet aangepakt.
 
 2. **[PENDING] Admin-login koppelen aan persoonlijke wachtwoorden.** Nu gebruiken index.html en ledenbeheer.html nog `DEMO_WACHTWOORD='rising'` in `doeAdminLogin()`. Vervangen door `fn_check_admin_login(gekozenMedewerkerId, wachtwoord)` via `checkAdminLogin()` uit databron. **Gevoelige stap**: als dit breekt kan niemand inloggen. Lana heeft al een wachtwoord, dus er is altijd een weg terug. Login moet checken tegen de in de dropdown gekozen medewerker.
 
