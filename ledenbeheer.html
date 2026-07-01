@@ -318,7 +318,8 @@ import { zoekLeden as dbZoekLeden, haalLid as dbHaalLid,
          gezinVanLid as dbGezinVanLid, maakGezin as dbMaakGezin,
          voegToeAanGezin as dbVoegToeAanGezin, verwijderUitGezin as dbVerwijderUitGezin,
          alleActiviteiten as dbAlleActiviteiten,
-         actieveMedewerkers as dbActieveMedewerkers } from './src/lib/databron.js';
+         actieveMedewerkers as dbActieveMedewerkers,
+         checkAdminLogin as dbCheckAdminLogin } from './src/lib/databron.js';
 
 // Tijdelijk: vaste medewerker (Sara uit de testdata), zoals in de check-in.
 // De medewerker die nu werkt. Gekozen via de dropdown, bewaard in sessionStorage
@@ -1003,7 +1004,6 @@ function ongedaan(lidId,index){
 // In de echte app gebeurt de wachtwoordcontrole via Supabase Auth.
 // ===========================================================================
 // wie mag admin worden: bepaald door is_admin uit de database
-const DEMO_WACHTWOORD='rising';                  // alleen voor het prototype
 const ADMIN_TIMEOUT=10*60*1000;                  // 10 minuten
 let adminModusActief=false, adminTimer=null;
 try{ if(sessionStorage.getItem('ry_admin')==='1') adminModusActief=true; }catch(e){}
@@ -1027,9 +1027,18 @@ function adminKnopActie(){
   setTimeout(()=>document.getElementById('admin-wachtwoord').focus(),50);
 }
 function sluitAdminLogin(){document.getElementById('overlay-admin').classList.remove('open');}
-function doeAdminLogin(){
+async function doeAdminLogin(){
   const ww=document.getElementById('admin-wachtwoord').value;
-  if(ww===DEMO_WACHTWOORD){
+  document.getElementById('admin-fout').style.display='none';
+  let ok=false;
+  try{
+    ok = await dbCheckAdminLogin(HUIDIGE_MEDEWERKER_ID, ww);
+  }catch(e){
+    console.error('Admin-login mislukte:', e);
+    toon('&#9888;&#65039; Inloggen mislukte (geen verbinding?)');
+    return;
+  }
+  if(ok){
     adminModusActief=true;
     try{ sessionStorage.setItem('ry_admin','1'); }catch(e){}
     sluitAdminLogin();

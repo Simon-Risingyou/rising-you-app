@@ -156,21 +156,23 @@ Net afgerond en volledig werkend tegen de database:
 - Ledenbeheer (zoeken, gegevens, tarief, sociaal tarief, tegoed, kaartjes met failsafe + jsPDF-print 85×54mm, gezinnen).
 - Admin portaal: sessiebeheer, activiteitenbeheer (incl. gratis/betalend bewerken), recente wijzigingen (sorteert recentste eerst, logt "van X naar Y"), accounts goedkeuren/afwijzen.
 - Medewerker-selectie gekoppeld; logging registreert de juiste medewerker; admin-rechten via `is_admin`.
-- pgcrypto aan; `fn_zet_admin_wachtwoord` en `fn_check_admin_login` werken (Lana heeft een wachtwoord).
+- pgcrypto aan; `fn_zet_admin_wachtwoord` en `fn_check_admin_login` werken (Lana heeft een wachtwoord, momenteel `testww1234` — nog te vervangen door haar echte keuze via de Medewerkers-tab).
 - **(2026-07-01)** DB-drift opgelost: migratie `0011_baseline_live_functies.sql` gepusht, repo en live database lopen weer gelijk (zie "Database-werkwijze" hierboven).
 - **(2026-07-01)** Medewerkersbeheer getest en werkend bevonden (zie item 1 hieronder, nu afgevinkt).
+- **(2026-07-01)** Admin-login koppelen aan persoonlijke wachtwoorden afgerond en getest (zie item 2 hieronder, nu afgevinkt).
+
+### RECENT AFGEROND (details)
+
+- **Medewerkersbeheer in het admin portaal**: tabblad "Medewerkers" (lijst, toevoegen, admin-rechten togglen, wachtwoord instellen, deactiveren, laatste-admin-bescherming) — gebouwd en op 2026-07-01 via headless-browser doorloop (Playwright, nu devDependency) getest: beide tabbladen tekenen correct, geen console-errors, alle acties + de laatste-actieve-admin-bescherming werken.
+- **Admin-login op persoonlijke wachtwoorden**: `index.html`/`ledenbeheer.html` gebruiken niet meer `DEMO_WACHTWOORD`; `doeAdminLogin()` is async en roept `checkAdminLogin()` (→ `fn_check_admin_login`) aan met de in de dropdown gekozen medewerker, met aparte foutmelding bij verbindingsproblemen. Bijkomende drift gevonden en opgelost: migratie 0006's opgeslagen tekst miste de `search_path`-fix die al live stond — vastgelegd in `0012_admin_login_search_path.sql`. Getest op 2026-07-01 via browser: oud demo-wachtwoord geweigerd, fout wachtwoord geweigerd, juist wachtwoord logt in (beide schermen), niet-admin kan het loginscherm niet openen.
 
 ### DIRECT OPENSTAAND — hier zijn we mee bezig
 
-1. **[GETEST, WERKT] Medewerkersbeheer in het admin portaal.** Tabblad "Medewerkers": lijst, toevoegen (voornaam/achternaam/admin-switch), admin-rechten togglen, wachtwoord instellen (popup), deactiveren. Beschermt de laatste actieve admin. databron-functies: `alleMedewerkers`, `maakMedewerker`, `deactiveerMedewerker`, `zetAdminRechten`, `zetAdminWachtwoord`, `checkAdminLogin`.
-   - **Getest (2026-07-01) via een headless-browser doorloop** (Playwright, nu als devDependency in `package.json` voor toekomstige UI-tests) van `npm run dev`: beide tabbladen (Activiteiten, Medewerkers) tekenen correct, geen console-errors. Toevoegen, admin-rechten aan/uit, wachtwoord instellen, en deactiveren werken allemaal. De laatste-actieve-admin-bescherming blokkeert correct zowel het uitzetten van admin-rechten als het deactiveren, met een duidelijke Nederlandse foutmelding.
-   - Let op: `HUIDIGE_MEDEWERKER_ID` in `admin-portaal.html` staat nog hardgecodeerd op Lana (`...b1`) in plaats van de in de kassa/ledenbeheer gekozen medewerker over te nemen — logging in het admin-portaal registreert dus altijd Lana, niet de effectief ingelogde admin. Nog niet aangepakt.
-
-2. **[PENDING] Admin-login koppelen aan persoonlijke wachtwoorden.** Nu gebruiken index.html en ledenbeheer.html nog `DEMO_WACHTWOORD='rising'` in `doeAdminLogin()`. Vervangen door `fn_check_admin_login(gekozenMedewerkerId, wachtwoord)` via `checkAdminLogin()` uit databron. **Gevoelige stap**: als dit breekt kan niemand inloggen. Lana heeft al een wachtwoord, dus er is altijd een weg terug. Login moet checken tegen de in de dropdown gekozen medewerker.
+1. **`HUIDIGE_MEDEWERKER_ID` in `admin-portaal.html` staat hardgecodeerd op Lana** (`...b1`) in plaats van de in de kassa/ledenbeheer gekozen medewerker over te nemen — logging in het admin-portaal registreert dus altijd Lana, niet de effectief ingelogde admin. Ontdekt tijdens het testen van medewerkersbeheer, nog niet opgelost.
 
 ### DAARNA (door gebruiker gekozen prioriteit)
-3. **Visuele kaart-editor** in het admin portaal: upload huisstijl-achtergrond, versleepbare QR- en naam-boxen, layout opslaan, toepassen bij het printen. Nu is het kaartontwerp hardgecodeerd in jsPDF (QR links ~34mm, naam rechts, tekst "Rising You — lidkaart"). Gebruiker koos expliciet voor een "volwaardige visuele editor".
-4. **Statistieksectie** (tab bestaat al als uitgeschakeld "Statistieken (later)"): anonieme aantallen op leeftijd, postcode, herkomst, deelnames per activiteit.
+2. **Visuele kaart-editor** in het admin portaal: upload huisstijl-achtergrond, versleepbare QR- en naam-boxen, layout opslaan, toepassen bij het printen. Nu is het kaartontwerp hardgecodeerd in jsPDF (QR links ~34mm, naam rechts, tekst "Rising You — lidkaart"). Gebruiker koos expliciet voor een "volwaardige visuele editor".
+3. **Statistieksectie** (tab bestaat al als uitgeschakeld "Statistieken (later)"): anonieme aantallen op leeftijd, postcode, herkomst, deelnames per activiteit.
 
 ### LATER / UITBREIDINGEN
 - Website-zelfregistratie op afgeschermd deel van risingyou.be (account aanmaken + eigen beurten/abonnement zien; nog geen digitaal beheer/betaling). Live sync met dezelfde database; vangnet als internet wegvalt.

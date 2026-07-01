@@ -263,7 +263,8 @@ import { verwerkScan as dbVerwerkScan, gezinVanLid, beschikbaarTegoed,
          herstelNaarWachtkamer as dbHerstelNaarWachtkamer,
          sessiesVandaag as dbSessiesVandaag, haalLid as dbHaalLid,
          alleActiviteiten as dbAlleActiviteiten,
-         actieveMedewerkers as dbActieveMedewerkers } from './src/lib/databron.js';
+         actieveMedewerkers as dbActieveMedewerkers,
+         checkAdminLogin as dbCheckAdminLogin } from './src/lib/databron.js';
 
 // Tijdelijk: vaste medewerker (Sara uit de testdata) tot de echte
 // medewerker-keuze gekoppeld is aan de database-UUID's.
@@ -1055,7 +1056,6 @@ function toon(t){const el=document.getElementById('toast');el.innerHTML=t;el.cla
 // ===========================================================================
 // ADMIN-MODUS (zie ledenbeheer voor uitleg; identiek gedrag)
 // ===========================================================================
-const DEMO_WACHTWOORD='rising';
 const ADMIN_TIMEOUT=10*60*1000;
 let adminModusActief=false, adminTimer=null;
 try{ if(sessionStorage.getItem('ry_admin')==='1') adminModusActief=true; }catch(e){}
@@ -1075,9 +1075,18 @@ function adminKnopActie(){
   setTimeout(()=>document.getElementById('admin-wachtwoord').focus(),50);
 }
 function sluitAdminLogin(){document.getElementById('overlay-admin').classList.remove('open');}
-function doeAdminLogin(){
+async function doeAdminLogin(){
   const ww=document.getElementById('admin-wachtwoord').value;
-  if(ww===DEMO_WACHTWOORD){
+  document.getElementById('admin-fout').style.display='none';
+  let ok=false;
+  try{
+    ok = await dbCheckAdminLogin(HUIDIGE_MEDEWERKER_ID, ww);
+  }catch(e){
+    console.error('Admin-login mislukte:', e);
+    toon('&#9888;&#65039; Inloggen mislukte (geen verbinding?)');
+    return;
+  }
+  if(ok){
     adminModusActief=true;
     try{ sessionStorage.setItem('ry_admin','1'); }catch(e){}
     sluitAdminLogin(); werkAdminKnopBij(); startAdminTimer();
