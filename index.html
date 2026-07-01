@@ -261,7 +261,9 @@ import { verwerkScan as dbVerwerkScan, gezinVanLid, beschikbaarTegoed,
          sessiesVandaag as dbSessiesVandaag, haalLid as dbHaalLid,
          alleActiviteiten as dbAlleActiviteiten,
          actieveMedewerkers as dbActieveMedewerkers,
-         checkAdminLogin as dbCheckAdminLogin } from './src/lib/databron.js';
+         checkAdminLogin as dbCheckAdminLogin,
+         zoekLeden as dbZoekLeden,
+         maakLid as dbMaakLid } from './src/lib/databron.js';
 
 // Tijdelijk: vaste medewerker (Sara uit de testdata) tot de echte
 // medewerker-keuze gekoppeld is aan de database-UUID's.
@@ -354,23 +356,6 @@ async function laadActiviteitenLijst(){
     if(lijst.length>0) ACTIVITEITEN = lijst.map(a=>({code:a.code, naam:a.naam, gratis:a.gratis}));
   }catch(e){ console.error('Activiteiten laden mislukte:',e); }
 }
-const leden = {
-  "RY-guy":   {id:"guy",   voornaam:"Guy",   achternaam:"Janssens",sociaal:false, nieuw:false, jaar:1985, postcode:"2018", herkomst:"Belgi\u00eb",  gezinId:"g1", gezinRol:"voogd", tariefHandmatig:null,
-    beurtenkaarten:[{activiteit:"klimmen",tarief:"volwassene",beurten:12}], abonnementen:[{activiteit:"yoga",tarief:"volwassene",tot:"2026-12-31"}]},
-  "RY-sam":   {id:"sam",   voornaam:"Sam",   achternaam:"Janssens",sociaal:false, nieuw:false, jaar:2014, postcode:"2018", herkomst:"Belgi\u00eb",  gezinId:"g1", gezinRol:"kind", tariefHandmatig:null,
-    beurtenkaarten:[{activiteit:"klimmen",tarief:"kind",beurten:3}], abonnementen:[]},
-  "RY-simon": {id:"simon", voornaam:"Simon", achternaam:"Janssens",sociaal:false, nieuw:false, jaar:2016, postcode:"2018", herkomst:"Belgi\u00eb",  gezinId:"g1", gezinRol:"kind", tariefHandmatig:null,
-    beurtenkaarten:[{activiteit:"klimmen",tarief:"kind",beurten:0}], abonnementen:[]},
-  "RY-anna":  {id:"anna",  voornaam:"Anna",  achternaam:"Petrova", sociaal:false, nieuw:false, jaar:1992, postcode:"2018", herkomst:"Oekra\u00efne", gezinId:null, gezinRol:null, tariefHandmatig:null,
-    beurtenkaarten:[{activiteit:"klimmen",tarief:"volwassene",beurten:5}], abonnementen:[]},
-  "RY-omar":  {id:"omar",  voornaam:"Omar",  achternaam:"Haddad",  sociaal:true,  nieuw:false, jaar:2001, postcode:"2060", herkomst:"Syri\u00eb",  gezinId:null, gezinRol:null, tariefHandmatig:null,
-    beurtenkaarten:[{activiteit:"klimmen",tarief:"student",beurten:1}], abonnementen:[]},
-  "RY-lin":   {id:"lin",   voornaam:"Lin",   achternaam:"Chen",    sociaal:false, nieuw:false, jaar:1988, postcode:"2000", herkomst:"China", gezinId:null, gezinRol:null, tariefHandmatig:null,
-    beurtenkaarten:[], abonnementen:[{activiteit:"klimmen",tarief:"volwassene",tot:"2026-12-31"}]},
-  "RY-diego": {id:"diego", voornaam:"Diego", achternaam:"Morales", sociaal:true,  nieuw:false, jaar:1995, postcode:"2140", herkomst:"Venezuela", gezinId:null, gezinRol:null, tariefHandmatig:null,
-    beurtenkaarten:[], abonnementen:[{activiteit:"klimmen",tarief:"volwassene",tot:"2026-12-31"}]},
-};
-const gezinnen={ "g1":{id:"g1",naam:"Gezin Janssens"} };
 // Clubsessies hebben een vaste activiteit (admin kiest die) en weekdagen waarop
 // ze actief zijn (0=zondag..6=zaterdag). De check-in toont enkel sessies van vandaag.
 // Clubsessies van vandaag. Wordt gevuld uit de database (fn_momenten_van_dag)
@@ -396,100 +381,10 @@ async function laadSessies(){
   tekenSessies();
 }
 
-function tariefVan(l){
-  if(l.tariefHandmatig) return l.tariefHandmatig;
-  if(!l.jaar) return 'volwassene';
-  const leeftijd=new Date().getFullYear()-Number(l.jaar);
-  if(leeftijd<=13) return 'kind';
-  if(leeftijd<=25) return 'student';
-  return 'volwassene';
-}
 function activiteitNaam(code){const a=ACTIVITEITEN.find(x=>x.code===code);return a?a.naam:code;}
-function aboTotVoor(l,act){const a=(l.abonnementen||[]).filter(x=>x.activiteit===act && new Date(x.tot)>=new Date()).sort((p,q)=>new Date(q.tot)-new Date(p.tot))[0];return a?a.tot:null;}
-function beurtenVoor(l,act){return (l.beurtenkaarten||[]).filter(k=>k.activiteit===act).reduce((s,k)=>s+k.beurten,0);}
-function eersteBeurtkaart(l,act){return (l.beurtenkaarten||[]).find(k=>k.activiteit===act && k.beurten>0)||null;}
-const ledenById={}; Object.entries(leden).forEach(([k,l])=>{l.sleutel=k; ledenById[l.id]=l;});
-let wachtId=0, nieuwTeller=0;
+let wachtId=0;
 let gepakteKaartId=null;   // welke wachtkaart is 'opgepakt' om te plaatsen (aantik-methode)
 const wachtenden={}, dagcheckins=[];
-// ===========================================================================
-// GLOBALE SCAN-ONDERSCHEPPING
-// Een USB-handscanner 'typt' de code zeer snel + Enter. We luisteren op het
-// hele document: komt er een snelle burst die met 'RY-' begint, dan is het een
-// scan -> we verwerken ze rechtstreeks, ongeacht welk veld focus heeft of welk
-// venster openstaat. Typt een mens met de hand (trager), dan laten we alles
-// gewoon naar het actieve veld gaan.
-// ===========================================================================
-const SCAN_PREFIX='RY-';
-const SCAN_MAX_PAUZE=60;   // ms tussen toetsen: sneller = scanner
-let scanBuffer='', scanLaatste=0, scanBezig=false;
-
-document.addEventListener('keydown', function(e){
-  const nu=Date.now();
-  const pauze=nu-scanLaatste;
-  scanLaatste=nu;
-
-  // Te lange pauze -> nieuwe (mogelijke) burst begint opnieuw.
-  if(pauze>SCAN_MAX_PAUZE){ scanBuffer=''; scanBezig=false; }
-
-  if(e.key==='Enter'){
-    // Sluit de burst af enkel af als het op een geldige scan lijkt.
-    if(scanBezig && scanBuffer.startsWith(SCAN_PREFIX)){
-      e.preventDefault(); e.stopPropagation();
-      const code=scanBuffer; scanBuffer=''; scanBezig=false;
-      const actiefVeld = document.activeElement &&
-        (document.activeElement.tagName==='INPUT' || document.activeElement.tagName==='SELECT' ||
-         document.activeElement.tagName==='TEXTAREA') &&
-        document.activeElement.id!=='scaninput';
-      const vensterOpen = document.querySelector('.overlay.open')!==null;
-      verwerkScanCode(code, actiefVeld||vensterOpen);
-    } else {
-      scanBuffer=''; scanBezig=false;
-    }
-    return;
-  }
-
-  // Alleen 'gewone' tekens bufferen.
-  if(e.key.length===1){
-    scanBuffer+=e.key;
-    if(scanBuffer.length>=SCAN_PREFIX.length){
-      scanBezig = scanBuffer.startsWith(SCAN_PREFIX);
-    }
-    // Begint de buffer met 'RY-' en wordt er supersnel getypt, dan onderscheppen
-    // we de tekens zodat ze niet in het actieve veld terechtkomen.
-    if(scanBezig){
-      const actief=document.activeElement;
-      const isScanBalk = actief && actief.id==='scaninput';
-      if(!isScanBalk){ e.preventDefault(); e.stopPropagation(); }
-    }
-  }
-}, true);
-
-// Verwerkt een onderschepte scancode. toonMelding=true als bediende ergens
-// anders mee bezig was (venster open of in een veld aan het typen).
-function verwerkScanCode(code, toonMelding){
-  const lid=leden[code.trim()];
-  if(!lid){ toon('&#10060; Kaartje niet herkend. Vraag hulp aan een medewerker.'); return; }
-  piep();
-  if(toonMelding){ toonScanMelding(lid.voornaam+' '+lid.achternaam); }
-  checkInLid(lid,'check_in');
-}
-
-// Korte, opvallende melding bovenaan dat een scan herkend is.
-function toonScanMelding(naam){
-  let bar=document.getElementById('scan-melding');
-  if(!bar){
-    bar=document.createElement('div'); bar.id='scan-melding';
-    bar.style.cssText='position:fixed;top:0;left:0;right:0;background:#1e8a4c;color:#fff;'
-      +'padding:12px 20px;text-align:center;font-size:17px;font-weight:600;z-index:100;'
-      +'display:flex;align-items:center;justify-content:center;gap:10px';
-    document.body.appendChild(bar);
-  }
-  bar.innerHTML='<span style="font-size:1.2em">&#9989;</span> Scan herkend: '+naam+' staat in de wachtkamer';
-  bar.style.display='flex';
-  clearTimeout(bar._t);
-  bar._t=setTimeout(()=>{bar.style.display='none';}, 2600);
-}
 
 // De scan-balk zelf: gewoon Enter verwerkt de ingetypte/gescande code.
 document.getElementById('scaninput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();verwerkScan();}});
@@ -510,48 +405,57 @@ async function verwerkScan(){
       return;
     }
     piep();
-    // Haal de gezinsleden op (voor de aanvinkbare opties in de wachtkamer).
-    let gezinsleden=[];
-    try{
-      const gezin = await gezinVanLid(r.lid_id);
-      if(Array.isArray(gezin)){
-        gezinsleden = gezin.map(g=>({lidId:g.lid_id, naam:g.voornaam, rol:g.rol, aangevinkt:false, betaalwijze:null}));
-      }
-    }catch(e){ /* geen gezin of fout: gewoon zonder gezinsleden verder */ }
-
-    // Tegoed per activiteit ophalen voor de hoofdpersoon én de gezinsleden,
-    // en bewaren in een cache. De wachtkamer tekent daaruit (snel, geen herhaalde db-calls).
-    const tegoedCache = {};
-    const alleIds = [r.lid_id, ...gezinsleden.map(g=>g.lidId)];
-    await Promise.all(alleIds.map(async (pid)=>{
-      tegoedCache[pid] = {};
-      await Promise.all(ACTIVITEITEN.map(async (act)=>{
-        try{
-          const t = await beschikbaarTegoed(pid, act.code);
-          // t = { abonnement_geldig, abonnement_tot, beurten, beurtenkaart_id }
-          tegoedCache[pid][act.code] = {
-            abo: !!t?.abonnement_geldig,
-            aboTot: t?.abonnement_tot ?? null,
-            beurten: t?.beurten ?? 0,
-            kaartId: t?.beurtenkaart_id ?? null,
-          };
-        }catch(e){
-          tegoedCache[pid][act.code] = { abo:false, aboTot:null, beurten:0, kaartId:null };
-        }
-      }));
-    }));
-
-    // Bouw een lid-object zoals checkInLid het verwacht.
-    const lid={
-      id:r.lid_id, voornaam:r.voornaam, achternaam:r.achternaam,
-      sociaal:r.sociaal_tarief, nieuw:false,
-      gezinId: gezinsleden.length>0 ? 'db' : null, gezinRol:null,
-    };
-    checkInLidDb(lid, gezinsleden, 'check_in', r.checkin_id, tegoedCache);
+    await verwerkEchteCheckin(r, 'check_in');
   }catch(e){
     console.error('Scan-fout:', e);
     toon('&#9888;&#65039; Probleem bij het scannen. Probeer opnieuw.');
   }
+}
+
+// Gemeenschappelijke afhandeling na een ECHTE check-in/info-aanvraag (scan,
+// "Klant opzoeken" of "Nieuw profiel"): gezinsleden + tegoed per activiteit
+// ophalen en de wachtkamer-rij aanmaken. r = { checkin_id, lid_id, voornaam,
+// achternaam, sociaal_tarief, ... } zoals fn_verwerk_scan/fn_checkin_lid
+// teruggeven (eventueel verpakt in een array door de RPC).
+async function verwerkEchteCheckin(r, soort){
+  // Gezinsleden ophalen (voor de aanvinkbare opties in de wachtkamer).
+  let gezinsleden=[];
+  try{
+    const gezin = await gezinVanLid(r.lid_id);
+    if(Array.isArray(gezin)){
+      gezinsleden = gezin.map(g=>({lidId:g.lid_id, naam:g.voornaam, rol:g.rol, aangevinkt:false, betaalwijze:null}));
+    }
+  }catch(e){ /* geen gezin of fout: gewoon zonder gezinsleden verder */ }
+
+  // Tegoed per activiteit ophalen voor de hoofdpersoon én de gezinsleden,
+  // en bewaren in een cache. De wachtkamer tekent daaruit (snel, geen herhaalde db-calls).
+  const tegoedCache = {};
+  const alleIds = [r.lid_id, ...gezinsleden.map(g=>g.lidId)];
+  await Promise.all(alleIds.map(async (pid)=>{
+    tegoedCache[pid] = {};
+    await Promise.all(ACTIVITEITEN.map(async (act)=>{
+      try{
+        const t = await beschikbaarTegoed(pid, act.code);
+        // t = { abonnement_geldig, abonnement_tot, beurten, beurtenkaart_id }
+        tegoedCache[pid][act.code] = {
+          abo: !!t?.abonnement_geldig,
+          aboTot: t?.abonnement_tot ?? null,
+          beurten: t?.beurten ?? 0,
+          kaartId: t?.beurtenkaart_id ?? null,
+        };
+      }catch(e){
+        tegoedCache[pid][act.code] = { abo:false, aboTot:null, beurten:0, kaartId:null };
+      }
+    }));
+  }));
+
+  // Bouw een lid-object zoals checkInLidDb het verwacht.
+  const lid={
+    id:r.lid_id, voornaam:r.voornaam, achternaam:r.achternaam,
+    sociaal:r.sociaal_tarief, nieuw:false,
+    gezinId: gezinsleden.length>0 ? 'db' : null, gezinRol:null,
+  };
+  checkInLidDb(lid, gezinsleden, soort, r.checkin_id, tegoedCache);
 }
 
 // Variant van checkInLid die kant-en-klare gezinsleden meekrijgt (uit de database).
@@ -570,27 +474,6 @@ function checkInLidDb(lid, gezinsleden, soort, checkinId, tegoedCache){
   wachtenden[id]=w; dagcheckins.push(w);
   tekenWachtkamer(); tekenDag();
 }
-function checkInLid(lid,soort){
-  const id=++wachtId;
-  // Gezinsleden ophalen (andere leden in hetzelfde gezin) als optie bij check-in.
-  let gezinsleden=[];
-  if(soort==='check_in' && lid.gezinId){
-    gezinsleden=Object.values(leden).filter(x=>x.gezinId===lid.gezinId && x.id!==lid.id)
-      .map(x=>({lidId:x.id, naam:x.voornaam, rol:x.gezinRol, aangevinkt:false, betaalwijze:null}));
-    // betaalwijze: null (niet gekozen) | 'tegoed' (beurt/abo) | 'los' (losse beurt aan kassa)
-  }
-  const w={id,lidId:lid.id,naam:lid.voornaam+' '+lid.achternaam,sociaal:lid.sociaal,nieuw:lid.nieuw,
-    soort,
-    // hoofdpersoon betaalwijze: null tot gekozen. Bij info n.v.t.
-    betaalwijze: soort==='alleen_info'?null:null,
-    akaart:(lid.sociaal&&soort==='check_in')?false:null,
-    sessie:null,sessieAct:null,geannuleerd:false,tijd:nu(),wie:medewerker(),
-    gezinsleden, hoofdMee:true, afgetrokken:[]};
-  wachtenden[id]=w; dagcheckins.push(w);
-  tekenWachtkamer(); tekenDag();
-  if(soort==='alleen_info') toon('&#8505;&#65039; '+w.naam+' &#8212; alleen profiel, geen beurt');
-}
-
 // Tegoed voor een persoon + activiteit, uit de bij de scan opgehaalde cache van
 // deze check-in (w.tegoed). Valt terug op "niets" als het er niet is.
 function tegoedStatus(w, lidId, act){
@@ -719,52 +602,6 @@ async function vinkAkaart(id){
   }
 }
 function annuleer(id){const w=wachtenden[id];if(!w)return;if(gepakteKaartId===id){gepakteKaartId=null;markeerSessies();}w.geannuleerd=true;delete wachtenden[id];tekenWachtkamer();tekenDag();toon('&#8617;&#65039; Check-in geannuleerd');}
-// Bepaalt het tegoed voor één persoon. Lenen gebeurt apart (async) in wijsToe().
-function regelTegoed(persoonId, act, betaalwijze){
-  const l=ledenById[persoonId];
-  if(betaalwijze==='los') return {ok:true, bron:'los', afboeking:null};
-  if(aboTotVoor(l,act)) return {ok:true, bron:'abo', afboeking:null};
-  const eigen=eersteBeurtkaart(l,act);
-  if(eigen) return {ok:true, bron:'beurt', afboeking:{kaart:eigen}};
-  return {ok:false, geenTegoed:true};  // moet evt. lenen
-}
-function bronLabel(r){
-  if(r.bron==='abo')return 'abonnement';
-  if(r.bron==='beurt')return 'beurt';
-  if(r.bron==='geleend')return 'geleend van '+r.lenerNaam;
-  if(r.bron==='los')return 'losse beurt';
-  return r.bron;
-}
-// Toont een keuzevenster om van een gezinslid te lenen. Resolved met
-// {kaart, lenerNaam} of null (geannuleerd). Zelfde tarieftype krijgt voorrang/kleur.
-let leenResolver=null;
-function vraagLenen(persoon, act, gezinId){
-  return new Promise(resolve=>{
-    leenResolver=resolve;
-    const eigenTarief=tariefVan(persoon);
-    const leners=Object.values(leden).filter(x=>x.gezinId===gezinId && x.id!==persoon.id)
-      .map(x=>({lid:x, kaart:eersteBeurtkaart(x,act)})).filter(c=>c.kaart);
-    // Sorteer: zelfde tarieftype eerst.
-    leners.sort((a,b)=>{
-      const sa=tariefVan(a.lid)===eigenTarief?0:1, sb=tariefVan(b.lid)===eigenTarief?0:1;
-      return sa-sb;
-    });
-    document.getElementById('leen-uitleg').innerHTML=persoon.voornaam+' heeft geen '+activiteitNaam(act)+'-beurt meer. Van wie mag een beurt geleend worden?';
-    const box=document.getElementById('leen-opties');
-    box.innerHTML='';
-    leners.forEach((c,i)=>{
-      const zelfde=tariefVan(c.lid)===eigenTarief;
-      const b=document.createElement('button');
-      b.className='leen-knop'+(zelfde?' voorkeur':'');
-      b.innerHTML='<b>'+c.lid.voornaam+'</b> &#183; '+tariefVan(c.lid)+' &#183; nog '+c.kaart.beurten+' beurten'+(zelfde?' <span class="leen-tag">zelfde tarief</span>':'');
-      b.onclick=()=>{ const r=leenResolver; leenResolver=null; document.getElementById('overlay-lenen').classList.remove('open'); r({kaart:c.kaart, lenerNaam:c.lid.voornaam}); };
-      box.appendChild(b);
-    });
-    document.getElementById('overlay-lenen').classList.add('open');
-  });
-}
-function leenAnnuleer(){ if(leenResolver){ const r=leenResolver; leenResolver=null; document.getElementById('overlay-lenen').classList.remove('open'); r(null); } }
-
 // --- Aantik-methode: pak een kaart, plaats hem dan op een sessie ---
 function pakKaart(id){
   const w=wachtenden[id]; if(!w) return;
@@ -956,46 +793,70 @@ async function herstelNaarWachtkamer(id){
   tekenWachtkamer();tekenDag();
   toon('&#8617;&#65039; '+w.naam+' terug in de wachtkamer &#8212; beurt teruggezet indien van toepassing');
 }
-function zoek(){
-  const q=document.getElementById('zoekinput').value.trim().toLowerCase();
+// Zoekt leden op naam via fn_zoek_leden (echte database). Check-in/info-knop
+// roept dezelfde echte check-in-weg aan als een scan (fn_checkin_lid + de
+// gemeenschappelijke afhandeling in verwerkEchteCheckin).
+let zoekTeller=0;
+async function zoek(){
+  const q=document.getElementById('zoekinput').value.trim();
   const box=document.getElementById('zoekresultaten');
   if(q.length<1){box.innerHTML='';return;}
-  const treffers=Object.values(leden).filter(l=>(l.voornaam+' '+l.achternaam).toLowerCase().includes(q));
+  const dezeZoekopdracht=++zoekTeller;
+  box.innerHTML='<div class="uitleg" style="text-align:left">Zoeken&#8230;</div>';
+  let treffers=[];
+  try{ treffers = await dbZoekLeden(q) || []; }
+  catch(e){ console.error('Zoeken mislukte:',e); }
+  if(dezeZoekopdracht!==zoekTeller) return; // ondertussen een nieuwere zoekopdracht gestart
   box.innerHTML='';
-  if(treffers.length===0){box.innerHTML='<div class="uitleg" style="text-align:left">Geen klant gevonden.</div>';return;}
+  if(!Array.isArray(treffers) || treffers.length===0){box.innerHTML='<div class="uitleg" style="text-align:left">Geen klant gevonden.</div>';return;}
   treffers.forEach(l=>{
-    const aboGeldig=l.abo&&new Date(l.abo)>=new Date();
-    const st=aboGeldig?'Abonnement geldig':(l.beurten>0?l.beurten+' beurten over':'Geen beurten');
-    const r=document.createElement('div');r.className='zoekrij';
-    r.innerHTML='<div class="fotomini">&#128100;</div><div class="nm">'+l.voornaam+' '+l.achternaam+'<div class="st">'+st+'</div></div>';
+    const aboGeldig=!!l.abonnement_tot && new Date(l.abonnement_tot)>=new Date();
+    const st=aboGeldig?'Abonnement geldig':(l.beurten_resterend>0?l.beurten_resterend+' beurten over':'Geen beurten');
+    const rij=document.createElement('div');rij.className='zoekrij';
+    rij.innerHTML='<div class="fotomini">&#128100;</div><div class="nm">'+l.voornaam+' '+(l.achternaam||'')+'<div class="st">'+st+'</div></div>';
     const acties=document.createElement('div');acties.style.cssText='display:flex;flex-direction:column;gap:6px';
     const bIn=document.createElement('button');bIn.className='mini-knop';bIn.style.color='var(--groen)';bIn.innerHTML='&#10003; Check-in';
-    bIn.onclick=ev=>{ev.stopPropagation();checkInLid(l,'check_in');document.getElementById('zoekinput').value='';box.innerHTML='';};
+    bIn.onclick=ev=>{ev.stopPropagation();kiesUitZoekresultaat(l.lid_id,'check_in');};
     const bInfo=document.createElement('button');bInfo.className='mini-knop';bInfo.style.color='var(--blauw)';bInfo.innerHTML='&#8505;&#65039; Alleen info';
-    bInfo.onclick=ev=>{ev.stopPropagation();checkInLid(l,'alleen_info');document.getElementById('zoekinput').value='';box.innerHTML='';};
-    acties.appendChild(bIn);acties.appendChild(bInfo);r.appendChild(acties);box.appendChild(r);
+    bInfo.onclick=ev=>{ev.stopPropagation();kiesUitZoekresultaat(l.lid_id,'alleen_info');};
+    acties.appendChild(bIn);acties.appendChild(bInfo);rij.appendChild(acties);box.appendChild(rij);
   });
+}
+async function kiesUitZoekresultaat(lidId, soort){
+  document.getElementById('zoekinput').value=''; document.getElementById('zoekresultaten').innerHTML='';
+  try{
+    const res = await dbCheckInLid(lidId, HUIDIGE_MEDEWERKER_ID, soort);
+    const r = Array.isArray(res) ? res[0] : res;
+    if(!r || !r.lid_id){ toon('&#9888;&#65039; Kon lid niet vinden.'); return; }
+    piep();
+    await verwerkEchteCheckin(r, soort);
+    if(soort==='alleen_info') toon('&#8505;&#65039; '+r.voornaam+' '+r.achternaam+' &#8212; alleen profiel, geen beurt');
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Inchecken mislukte.'); }
 }
 function openNieuwProfiel(){document.getElementById('overlay-nieuw').classList.add('open');}
 function sluitNieuw(){document.getElementById('overlay-nieuw').classList.remove('open');}
-function maakNieuwProfiel(){
+async function maakNieuwProfiel(){
   const vn=document.getElementById('np-voornaam').value.trim();
   const an=document.getElementById('np-achternaam').value.trim();
   if(!vn){toon('&#9888;&#65039; Vul minstens een voornaam in');return;}
   const sociaal=document.getElementById('np-sociaal').value==='ja';
-  const id='nieuw'+(++nieuwTeller);
-  const l={id,voornaam:vn,achternaam:an,sociaal,abo:null,beurten:0,nieuw:true,sleutel:null,
-    jaar:document.getElementById('np-jaar').value||null,
-    postcode:document.getElementById('np-postcode').value||null,
-    herkomst:document.getElementById('np-herkomst').value||null};
-  ledenById[id]=l; sluitNieuw();
-  ['np-voornaam','np-achternaam','np-jaar','np-postcode','np-herkomst','np-herkomst-code'].forEach(x=>document.getElementById(x).value='');
-  landGekozen=null;
-  document.getElementById('np-land-tekst').innerHTML='Kies een land\u2026';
-  document.getElementById('np-land-knop').classList.remove('gekozen');
-  document.getElementById('np-sociaal').value='nee';
-  checkInLid(l,'check_in');
-  toon('&#9989; Profiel aangemaakt &#8212; staat in de wachtkamer');
+  const jaar=document.getElementById('np-jaar').value;
+  const postcode=document.getElementById('np-postcode').value||null;
+  const herkomst=document.getElementById('np-herkomst').value||null;
+  try{
+    const nieuwId = await dbMaakLid(vn, an||null, jaar?parseInt(jaar,10):null, postcode, herkomst, sociaal, HUIDIGE_MEDEWERKER_ID);
+    sluitNieuw();
+    ['np-voornaam','np-achternaam','np-jaar','np-postcode','np-herkomst','np-herkomst-code'].forEach(x=>document.getElementById(x).value='');
+    landGekozen=null;
+    document.getElementById('np-land-tekst').innerHTML='Kies een land\u2026';
+    document.getElementById('np-land-knop').classList.remove('gekozen');
+    document.getElementById('np-sociaal').value='nee';
+
+    const res = await dbCheckInLid(nieuwId, HUIDIGE_MEDEWERKER_ID, 'check_in');
+    const r = Array.isArray(res) ? res[0] : res;
+    if(r && r.lid_id){ piep(); await verwerkEchteCheckin(r, 'check_in'); }
+    toon('&#9989; Profiel aangemaakt &#8212; staat in de wachtkamer');
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Profiel aanmaken mislukte.'); }
 }
 async function toonProfiel(lidId){
   // Zoek de check-in (wachtkamer) waar deze persoon bij hoort, voor naam + tegoed.

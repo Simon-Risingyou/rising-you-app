@@ -30,6 +30,19 @@ export async function zoekLeden(zoekterm) {
   return data;
 }
 
+// Nieuw lid aanmaken aan de kassa (gebruikt fn_maak_lid uit migratie 0019).
+// Geeft het nieuwe lid-id terug. goedkeuring staat op 'nieuw' (admin keurt
+// later goed), maar dat blokkeert het meteen inchecken niet.
+export async function maakLid(voornaam, achternaam, geboortejaar, postcode, herkomst, sociaalTarief, medewerkerId) {
+  const { data, error } = await supabase.rpc('fn_maak_lid', {
+    p_voornaam: voornaam, p_achternaam: achternaam, p_geboortejaar: geboortejaar,
+    p_postcode: postcode, p_herkomst: herkomst, p_sociaal_tarief: sociaalTarief,
+    p_medewerker_id: medewerkerId,
+  });
+  if (error) throw error;
+  return data;
+}
+
 // Haal één lid met al zijn tegoed (beurtenkaarten + abonnementen per activiteit).
 // Loopt via fn_haal_lid (security definer), niet rechtstreeks op de tabel, zodat
 // RLS de leden-tabel kan afschermen en enkel de nodige velden meekomen.
