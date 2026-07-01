@@ -61,6 +61,7 @@
   .wachtkaart.paars{border-left:8px solid var(--paars);background:var(--paars-licht)}
   .wachtkaart.info{border-left:8px solid var(--blauw);background:var(--blauw-licht)}
   .fotomini{width:50px;height:50px;border-radius:10px;background:#eceae3;display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--grijs);flex-shrink:0;overflow:hidden}
+  .fotomini img{width:100%;height:100%;object-fit:cover}
   .wk-info{flex:1;min-width:0}
   .wk-info .naam{font-size:18px;font-weight:700}
   .wk-status{font-size:14px;margin-top:2px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
@@ -105,7 +106,8 @@
   .profiel-rij:last-child{border-bottom:none}
   .profiel-rij .pl{color:var(--grijs)}
   .profiel-rij .pv{font-weight:600;text-align:right}
-  .profiel-foto{width:80px;height:80px;border-radius:14px;background:#eceae3;display:flex;align-items:center;justify-content:center;font-size:36px;color:var(--grijs);margin:0 auto 14px}
+  .profiel-foto{width:80px;height:80px;border-radius:14px;background:#eceae3;display:flex;align-items:center;justify-content:center;font-size:36px;color:var(--grijs);margin:0 auto 14px;overflow:hidden}
+  .profiel-foto img{width:100%;height:100%;object-fit:cover}
   .land-knop{width:100%;font-size:16px;padding:10px;border:2px solid var(--lijn);border-radius:10px;background:var(--wit);cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left}
   .land-knop:hover{border-color:var(--blauw)}
   .land-knop.gekozen{border-color:var(--groen);background:var(--groen-licht)}
@@ -223,7 +225,7 @@
 <div class="overlay" id="overlay-profiel">
   <div class="modal" style="max-width:400px">
     <h3><span class="sym">&#128100;</span> Gegevens</h3>
-    <div class="profiel-foto">&#128100;</div>
+    <div class="profiel-foto" id="profiel-foto">&#128100;</div>
     <div id="profiel-inhoud"></div>
     <button class="knop knop-grijs knop-groot" style="margin-top:16px" onclick="sluitProfiel()">Sluiten</button>
   </div>
@@ -452,7 +454,7 @@ async function verwerkEchteCheckin(r, soort){
   // Bouw een lid-object zoals checkInLidDb het verwacht.
   const lid={
     id:r.lid_id, voornaam:r.voornaam, achternaam:r.achternaam,
-    sociaal:r.sociaal_tarief, nieuw:false,
+    sociaal:r.sociaal_tarief, nieuw:false, fotoPad:r.foto_pad,
     gezinId: gezinsleden.length>0 ? 'db' : null, gezinRol:null,
   };
   checkInLidDb(lid, gezinsleden, soort, r.checkin_id, tegoedCache);
@@ -462,6 +464,7 @@ async function verwerkEchteCheckin(r, soort){
 function checkInLidDb(lid, gezinsleden, soort, checkinId, tegoedCache){
   const id=++wachtId;
   const w={id,lidId:lid.id,naam:lid.voornaam+' '+lid.achternaam,sociaal:lid.sociaal,nieuw:lid.nieuw,
+    fotoPad:lid.fotoPad||null,
     soort,
     betaalwijze:null,
     akaart:(lid.sociaal&&soort==='check_in')?false:null,
@@ -584,7 +587,8 @@ function tekenWachtkamer(){
     const hint=w.soort==='alleen_info'
       ? '<div class="sleep-hint">Klik op &#10005; om te sluiten</div>'
       : (oppakbaar?'<div class="sleep-hint klaar">&#9989; Tik aan, kies dan een sessie</div>':'<div class="sleep-hint">'+watOntbreektOppakken(w)+'</div>');
-    div.innerHTML='<button class="annuleer" title="Annuleer" onclick="annuleer('+w.id+')">&#10005;</button><button class="infoknop" title="Toon gegevens" onclick="toonProfiel(\''+w.lidId+'\')">&#8505;</button><div class="fotomini">&#128100;</div><div class="wk-info"><div class="naam">'+w.naam+'</div>'+(badge?'<div class="wk-status">'+badge+'</div>':'')+tegoed+checks+gezinHtml+hint+'</div>';
+    const fotoHtml=w.fotoPad?'<img src="'+w.fotoPad+'">':'&#128100;';
+    div.innerHTML='<button class="annuleer" title="Annuleer" onclick="annuleer('+w.id+')">&#10005;</button><button class="infoknop" title="Toon gegevens" onclick="toonProfiel(\''+w.lidId+'\')">&#8505;</button><div class="fotomini">'+fotoHtml+'</div><div class="wk-info"><div class="naam">'+w.naam+'</div>'+(badge?'<div class="wk-status">'+badge+'</div>':'')+tegoed+checks+gezinHtml+hint+'</div>';
     lijst.appendChild(div);
   });
 }
@@ -813,7 +817,8 @@ async function zoek(){
     const aboGeldig=!!l.abonnement_tot && new Date(l.abonnement_tot)>=new Date();
     const st=aboGeldig?'Abonnement geldig':(l.beurten_resterend>0?l.beurten_resterend+' beurten over':'Geen beurten');
     const rij=document.createElement('div');rij.className='zoekrij';
-    rij.innerHTML='<div class="fotomini">&#128100;</div><div class="nm">'+l.voornaam+' '+(l.achternaam||'')+'<div class="st">'+st+'</div></div>';
+    const fotoHtml=l.foto_pad?'<img src="'+l.foto_pad+'">':'&#128100;';
+    rij.innerHTML='<div class="fotomini">'+fotoHtml+'</div><div class="nm">'+l.voornaam+' '+(l.achternaam||'')+'<div class="st">'+st+'</div></div>';
     const acties=document.createElement('div');acties.style.cssText='display:flex;flex-direction:column;gap:6px';
     const bIn=document.createElement('button');bIn.className='mini-knop';bIn.style.color='var(--groen)';bIn.innerHTML='&#10003; Check-in';
     bIn.onclick=ev=>{ev.stopPropagation();kiesUitZoekresultaat(l.lid_id,'check_in');};
@@ -880,6 +885,7 @@ async function toonProfiel(lidId){
     tegoedTekst = delen.length>0 ? delen.join('<br>') : 'Geen actief tegoed';
   }
   // Toon het venster meteen met wat we al hebben; vul de rest aan uit de database.
+  document.getElementById('profiel-foto').innerHTML = w&&w.fotoPad ? '<img src="'+w.fotoPad+'">' : '&#128100;';
   document.getElementById('profiel-inhoud').innerHTML=
     rij('Naam', naam)
     + rij('Leeftijd', '&#8230;')
@@ -888,12 +894,13 @@ async function toonProfiel(lidId){
     + rij('Sociaal tarief', (w&&w.sociaal)?'Ja &#8212; A-Kaart nodig':'Nee')
     + rij('Tegoed', tegoedTekst);
   document.getElementById('overlay-profiel').classList.add('open');
-  // Haal de profielgegevens op (geboortejaar, postcode, herkomst).
+  // Haal de profielgegevens op (geboortejaar, postcode, herkomst, foto).
   try{
     const p = await dbHaalLid(lidId);
     if(p){
       const leeftijd = p.geboortejaar ? (new Date().getFullYear()-p.geboortejaar)+' jaar (' + p.geboortejaar + ')' : '&#8212;';
       const volNaam = (p.voornaam||'') + ' ' + (p.achternaam||'');
+      document.getElementById('profiel-foto').innerHTML = p.foto_pad ? '<img src="'+p.foto_pad+'">' : '&#128100;';
       document.getElementById('profiel-inhoud').innerHTML=
         rij('Naam', volNaam.trim()||naam)
         + rij('Leeftijd', leeftijd)
