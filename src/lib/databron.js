@@ -473,3 +473,27 @@ export async function synchroniseerWachtrij() {
     }
   }
 }
+
+// Kaartontwerp (visuele editor): achtergrond + positie/grootte van QR- en naam-box.
+export async function haalKaartLayout() {
+  const { data, error } = await supabase.rpc('fn_haal_kaart_layout');
+  if (error) throw error;
+  return data;
+}
+
+export async function bewaarKaartLayout(layout, medewerkerId) {
+  const { data, error } = await supabase.rpc('fn_bewaar_kaart_layout', {
+    p_achtergrond_data: layout.achtergrond_data ?? null,
+    p_qr_x: layout.qr_x,
+    p_qr_y: layout.qr_y,
+    p_qr_grootte: layout.qr_grootte,
+    p_naam_x: layout.naam_x,
+    p_naam_y: layout.naam_y,
+    p_naam_lettergrootte: layout.naam_lettergrootte,
+    p_ondertitel: layout.ondertitel,
+    p_ondertitel_y: layout.ondertitel_y,
+    p_medewerker_id: medewerkerId,
+  });
+  if (error) throw error;
+  return data;
+}

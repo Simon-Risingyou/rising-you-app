@@ -143,6 +143,8 @@ Elk scherm koppelt HTML-`onclick`-handlers aan functies via `Object.assign(windo
 
 **Offline-cache (kassa)**: `fn_cache_leden()` — minimale ledenlijst incl. geldig QR-token, gebruikt door `vulCache()` in `databron.js` zodat de kassa kan doorwerken bij internetverlies.
 
+**Kaartontwerp (admin)**: `fn_haal_kaart_layout()→jsonb`, `fn_bewaar_kaart_layout(text,numeric,numeric,numeric,numeric,numeric,numeric,text,numeric,uuid)`. Werken op de singleton-tabel `kaart_layout` (één rij, `id boolean primary key default true`): achtergrond als base64 data-URL + positie/grootte van de QR-box en de naam-box. Zie ook item hieronder.
+
 **Enums**: `goedkeuring` = {nieuw, goedgekeurd, afgewezen}. Verder o.a. `tarieftype`, `toewijzing_type`, `abonnement_duur`.
 
 **Testdata**: medewerkers `...b1` Lana (admin, **heeft wachtwoord**), `...b2` Sara, `...b3` Mehmet, `...b4` Joke. Leden `...0001`–`0009`. Clubsessies `...00c1` (Klimclub/klimmen), `...00c2` (Yoga), `...00c3` (We Workout), elk met momenten voor alle weekdagen.
@@ -160,20 +162,21 @@ Net afgerond en volledig werkend tegen de database:
 - **(2026-07-01)** DB-drift opgelost: migratie `0011_baseline_live_functies.sql` gepusht, repo en live database lopen weer gelijk (zie "Database-werkwijze" hierboven).
 - **(2026-07-01)** Medewerkersbeheer getest en werkend bevonden (zie item 1 hieronder, nu afgevinkt).
 - **(2026-07-01)** Admin-login koppelen aan persoonlijke wachtwoorden afgerond en getest (zie item 2 hieronder, nu afgevinkt).
+- **(2026-07-01)** Visuele kaart-editor gebouwd en getest (zie hieronder).
 
 ### RECENT AFGEROND (details)
 
 - **Medewerkersbeheer in het admin portaal**: tabblad "Medewerkers" (lijst, toevoegen, admin-rechten togglen, wachtwoord instellen, deactiveren, laatste-admin-bescherming) — gebouwd en op 2026-07-01 via headless-browser doorloop (Playwright, nu devDependency) getest: beide tabbladen tekenen correct, geen console-errors, alle acties + de laatste-actieve-admin-bescherming werken.
 - **Admin-login op persoonlijke wachtwoorden**: `index.html`/`ledenbeheer.html` gebruiken niet meer `DEMO_WACHTWOORD`; `doeAdminLogin()` is async en roept `checkAdminLogin()` (→ `fn_check_admin_login`) aan met de in de dropdown gekozen medewerker, met aparte foutmelding bij verbindingsproblemen. Bijkomende drift gevonden en opgelost: migratie 0006's opgeslagen tekst miste de `search_path`-fix die al live stond — vastgelegd in `0012_admin_login_search_path.sql`. Getest op 2026-07-01 via browser: oud demo-wachtwoord geweigerd, fout wachtwoord geweigerd, juist wachtwoord logt in (beide schermen), niet-admin kan het loginscherm niet openen.
 - **(2026-07-01)** `HUIDIGE_MEDEWERKER_ID` in `admin-portaal.html` gekoppeld aan de echt ingelogde admin: leest nu `sessionStorage('ry_medewerker_id')` (zelfde sleutel als check-in/ledenbeheer) i.p.v. hardgecodeerd Lana. De "Admin: X"-badge bovenaan toont nu ook de echte naam (via `fn_alle_medewerkers`, opgehaald in nieuwe functie `laadAdminNaam()`). Getest via browser: ingelogd als Sara (tijdelijk admin gemaakt voor de test, nadien teruggezet) toont de badge "Sara" en nieuwe logregels in "Recente wijzigingen" tonen "(door Sara Helper)" i.p.v. Lana.
+- **(2026-07-01) Visuele kaart-editor**: nieuw tabblad "Kaartontwerp" in het admin portaal (migratie `0013_kaart_layout.sql`, singleton-tabel `kaart_layout`). Upload van een achtergrondafbeelding (bewaard als base64 data-URL, geen Supabase Storage-bucket nodig — er was er nog geen, en het gaat om één zelden wijzigende afbeelding), versleepbare QR-box en naam-box op een 5px/mm schaalmodel (425×270px voor de 85×54mm kaart), plus numerieke velden voor exacte positionering. **Belangrijk**: het slepen gebruikt pointer-events (pointerdown/move/up), NIET de native HTML5 drag-and-drop-API — die laatste is onbetrouwbaar in Tauri's WebView2 (zie geleerde lessen). `ledenbeheer.html`'s `doePrint()` is nu async en haalt de layout op via `fn_haal_kaart_layout()`, met terugval op de oorspronkelijke hardgecodeerde waarden als het laden mislukt (bv. offline) of nog niets is opgeslagen. Getest via browser: posities wijzigen via velden én via slepen werken en blijven gesynchroniseerd, achtergrond uploaden werkt, opslaan werkt, en een nieuw kaartje printen na het opslaan genereert de PDF zonder fouten (blob-URL in de print-iframe).
 
 ### DIRECT OPENSTAAND — hier zijn we mee bezig
 
-Geen — de drie items hierboven zijn afgerond. Volgende prioriteit is door de gebruiker gekozen, zie "DAARNA" hieronder.
+Geen — de "DAARNA"-items zijn stuk voor stuk aangepakt naarmate de gebruiker ze koos. Nog open: de statistieksectie (zie hieronder).
 
 ### DAARNA (door gebruiker gekozen prioriteit)
-1. **Visuele kaart-editor** in het admin portaal: upload huisstijl-achtergrond, versleepbare QR- en naam-boxen, layout opslaan, toepassen bij het printen. Nu is het kaartontwerp hardgecodeerd in jsPDF (QR links ~34mm, naam rechts, tekst "Rising You — lidkaart"). Gebruiker koos expliciet voor een "volwaardige visuele editor".
-2. **Statistieksectie** (tab bestaat al als uitgeschakeld "Statistieken (later)"): anonieme aantallen op leeftijd, postcode, herkomst, deelnames per activiteit.
+1. **Statistieksectie** (tab bestaat al als uitgeschakeld "Statistieken (later)"): anonieme aantallen op leeftijd, postcode, herkomst, deelnames per activiteit.
 
 ### LATER / UITBREIDINGEN
 - Website-zelfregistratie op afgeschermd deel van risingyou.be (account aanmaken + eigen beurten/abonnement zien; nog geen digitaal beheer/betaling). Live sync met dezelfde database; vangnet als internet wegvalt.

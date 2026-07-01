@@ -319,7 +319,8 @@ import { zoekLeden as dbZoekLeden, haalLid as dbHaalLid,
          voegToeAanGezin as dbVoegToeAanGezin, verwijderUitGezin as dbVerwijderUitGezin,
          alleActiviteiten as dbAlleActiviteiten,
          actieveMedewerkers as dbActieveMedewerkers,
-         checkAdminLogin as dbCheckAdminLogin } from './src/lib/databron.js';
+         checkAdminLogin as dbCheckAdminLogin,
+         haalKaartLayout as dbHaalKaartLayout } from './src/lib/databron.js';
 
 // Tijdelijk: vaste medewerker (Sara uit de testdata), zoals in de check-in.
 // De medewerker die nu werkt. Gekozen via de dropdown, bewaard in sessionStorage
@@ -1384,27 +1385,50 @@ function qrAlsDataUrl(){
   return null;
 }
 
-function doePrint(){
+// Detecteert het beeldformaat van een data-URL voor jsPDF's addImage.
+function afbeeldingFormaat(dataUrl){
+  if(!dataUrl) return 'PNG';
+  if(dataUrl.startsWith('data:image/jpeg') || dataUrl.startsWith('data:image/jpg')) return 'JPEG';
+  if(dataUrl.startsWith('data:image/webp')) return 'WEBP';
+  return 'PNG';
+}
+
+async function doePrint(){
   if(!nieuweQrCode || !huidigLid) return;
   const qrData=qrAlsDataUrl();
   if(!qrData){ toon('&#9888;&#65039; QR-code nog niet klaar, probeer opnieuw.'); return; }
+
+  // Kaartontwerp ophalen (visuele editor in het admin portaal). Bij een
+  // laadfout (bv. offline) vallen we terug op het oorspronkelijke ontwerp.
+  let layout;
+  try{ layout = await dbHaalKaartLayout(); }
+  catch(e){ console.error('Kaartontwerp laden mislukte, val terug op standaardontwerp:',e); layout=null; }
+  layout = Object.assign({
+    achtergrond_data:null, qr_x:8, qr_y:10, qr_grootte:34,
+    naam_x:48, naam_y:26, naam_lettergrootte:15,
+    ondertitel:'Rising You \u2014 lidkaart', ondertitel_y:33,
+  }, layout || {});
 
   // jsPDF: kaart van 85 x 54 mm (standaard visitekaartje), liggend.
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation:'landscape', unit:'mm', format:[85,54] });
 
-  // QR links, vierkant van 34 mm, verticaal gecentreerd.
-  const qrmm=34, qrx=8, qry=(54-qrmm)/2;
-  doc.addImage(qrData, 'PNG', qrx, qry, qrmm, qrmm);
+  if(layout.achtergrond_data){
+    doc.addImage(layout.achtergrond_data, afbeeldingFormaat(layout.achtergrond_data), 0, 0, 85, 54);
+  }
 
-  // Naam + ondertitel rechts van de QR.
-  const tx=qrx+qrmm+6;
-  doc.setFont('helvetica','bold'); doc.setFontSize(15);
+  // QR-box.
+  doc.addImage(qrData, 'PNG', layout.qr_x, layout.qr_y, layout.qr_grootte, layout.qr_grootte);
+
+  // Naam + ondertitel.
+  doc.setFont('helvetica','bold'); doc.setFontSize(layout.naam_lettergrootte);
   doc.setTextColor(40,40,40);
-  doc.text(huidigLid.voornaam+' '+huidigLid.achternaam, tx, 26, { maxWidth: 85-tx-4 });
-  doc.setFont('helvetica','normal'); doc.setFontSize(9);
-  doc.setTextColor(120,120,120);
-  doc.text('Rising You \u2014 lidkaart', tx, 33);
+  doc.text(huidigLid.voornaam+' '+huidigLid.achternaam, layout.naam_x, layout.naam_y, { maxWidth: 85-layout.naam_x-4 });
+  if(layout.ondertitel){
+    doc.setFont('helvetica','normal'); doc.setFontSize(9);
+    doc.setTextColor(120,120,120);
+    doc.text(layout.ondertitel, layout.naam_x, layout.ondertitel_y);
+  }
 
   // Open de PDF in een verborgen iframe en roep de printdialoog op.
   const blobUrl = doc.output('bloburl');

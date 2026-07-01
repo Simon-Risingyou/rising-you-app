@@ -114,6 +114,7 @@
     <button class="subtab" id="st-accounts" onclick="toonPaneel('accounts')"><span class="sym">&#10133;</span> Nieuwe accounts <span id="acc-teller" style="background:var(--rood);color:#fff;border-radius:999px;padding:1px 8px;font-size:12px;margin-left:4px"></span></button>
     <button class="subtab" id="st-activiteiten" onclick="toonPaneel('activiteiten')"><span class="sym">&#127919;</span> Activiteiten</button>
     <button class="subtab" id="st-medewerkers" onclick="toonPaneel('medewerkers')"><span class="sym">&#128101;</span> Medewerkers</button>
+    <button class="subtab" id="st-kaartontwerp" onclick="toonPaneel('kaartontwerp')"><span class="sym">&#128179;</span> Kaartontwerp</button>
     <button class="subtab" disabled style="opacity:.5;cursor:not-allowed"><span class="sym">&#128202;</span> Statistieken (later)</button>
   </div>
 
@@ -180,6 +181,47 @@
             <label class="toggle" style="white-space:nowrap"><span class="switch" id="nm-admin-switch" onclick="this.classList.toggle('aan')"></span> Admin</label></div>
           <div class="veld" style="flex:0 0 auto"><label style="visibility:hidden">.</label>
             <button class="knop knop-paars" onclick="maakMedewerkerDb()"><span class="sym">&#10133;</span> Toevoegen</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PANEEL: KAARTONTWERP -->
+  <div class="paneel" id="paneel-kaartontwerp">
+    <div class="kaart">
+      <h2><span class="sym">&#128179;</span> Kaartontwerp</h2>
+      <p style="font-size:14px;color:var(--grijs);margin-bottom:14px">Zo ziet het lidkaartje eruit dat geprint wordt (85 &times; 54 mm, liggend). Sleep de QR- of naam-box, of gebruik de velden voor een exacte positie.</p>
+      <div style="display:flex;gap:28px;flex-wrap:wrap;align-items:flex-start">
+        <div>
+          <div id="ko-canvas" style="position:relative;width:425px;height:270px;border:2px solid var(--lijn);border-radius:8px;overflow:hidden;background:#f4f4f4;background-size:cover;background-position:center">
+            <div id="ko-box-qr" style="position:absolute;box-sizing:border-box;border:2px dashed var(--paars);background:rgba(124,58,237,.10);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600;color:var(--paars);cursor:move;user-select:none;touch-action:none">QR</div>
+            <div id="ko-box-naam" style="position:absolute;box-sizing:border-box;border:2px dashed var(--blauw, #2563eb);background:rgba(37,99,235,.08);display:flex;flex-direction:column;justify-content:center;padding:4px 6px;overflow:hidden;cursor:move;user-select:none;touch-action:none">
+              <b id="ko-naam-preview" style="line-height:1.15;color:#282828">Voornaam Achternaam</b>
+              <span id="ko-ondertitel-preview" style="font-size:9px;color:#787878;margin-top:2px">Rising You &mdash; lidkaart</span>
+            </div>
+          </div>
+          <p style="font-size:12px;color:var(--grijs);margin-top:8px;max-width:425px">Dit is een schaalmodel (5px per mm), geen exacte printvoorbeeld van lettertype/QR-inhoud.</p>
+        </div>
+        <div style="flex:1;min-width:280px">
+          <div class="veld"><label>Achtergrondafbeelding (optioneel)</label>
+            <input type="file" id="ko-achtergrond-input" accept="image/*">
+            <button class="mini-knop grijs" style="margin-top:6px" onclick="verwijderKaartAchtergrond()">Achtergrond verwijderen</button>
+          </div>
+          <div class="veld-rij">
+            <div class="veld"><label>QR &mdash; x (mm)</label><input type="number" id="ko-qr-x" step="0.5"></div>
+            <div class="veld"><label>QR &mdash; y (mm)</label><input type="number" id="ko-qr-y" step="0.5"></div>
+            <div class="veld"><label>QR &mdash; grootte (mm)</label><input type="number" id="ko-qr-grootte" step="0.5"></div>
+          </div>
+          <div class="veld-rij">
+            <div class="veld"><label>Naam &mdash; x (mm)</label><input type="number" id="ko-naam-x" step="0.5"></div>
+            <div class="veld"><label>Naam &mdash; y (mm)</label><input type="number" id="ko-naam-y" step="0.5"></div>
+            <div class="veld"><label>Naam &mdash; lettergrootte</label><input type="number" id="ko-naam-lettergrootte" step="0.5"></div>
+          </div>
+          <div class="veld-rij">
+            <div class="veld" style="flex:2"><label>Ondertitel-tekst</label><input id="ko-ondertitel"></div>
+            <div class="veld"><label>Ondertitel &mdash; y (mm)</label><input type="number" id="ko-ondertitel-y" step="0.5"></div>
+          </div>
+          <button class="knop knop-paars" style="margin-top:8px" onclick="bewaarKaartLayoutDb()"><span class="sym">&#10003;</span> Kaartontwerp opslaan</button>
         </div>
       </div>
     </div>
@@ -268,7 +310,9 @@ import { alleClubsessies as dbAlleClubsessies, maakClubsessie as dbMaakClubsessi
          nieuweAccounts as dbNieuweAccounts,
          alleMedewerkers as dbAlleMedewerkers, maakMedewerker as dbMaakMedewerker,
          deactiveerMedewerker as dbDeactiveerMedewerker, zetAdminRechten as dbZetAdminRechten,
-         zetAdminWachtwoord as dbZetAdminWachtwoord } from './src/lib/databron.js';
+         zetAdminWachtwoord as dbZetAdminWachtwoord,
+         haalKaartLayout as dbHaalKaartLayout,
+         bewaarKaartLayout as dbBewaarKaartLayout } from './src/lib/databron.js';
 
 // De ingelogde admin is de medewerker die op check-in/ledenbeheer gekozen was
 // bij "Wie werkt nu?" (gedeeld via sessionStorage, zie CLAUDE.md).
@@ -350,7 +394,7 @@ function bevestigNee(){
 }
 
 function toonPaneel(naam){
-  ['sessies','wijzigingen','accounts','activiteiten','medewerkers'].forEach(p=>{
+  ['sessies','wijzigingen','accounts','activiteiten','medewerkers','kaartontwerp'].forEach(p=>{
     document.getElementById('paneel-'+p).classList.toggle('actief',p===naam);
     document.getElementById('st-'+p).classList.toggle('actief',p===naam);
   });
@@ -358,6 +402,7 @@ function toonPaneel(naam){
   if(naam==='wijzigingen') laadWijzigingen();
   if(naam==='accounts') laadAccounts();
   if(naam==='medewerkers') laadMedewerkersBeheer();
+  if(naam==='kaartontwerp') laadKaartOntwerp();
 }
 
 // ============ SESSIES ============
@@ -606,6 +651,147 @@ async function bewaarWachtwoord(){
   }catch(e){ console.error(e); toon('&#9888;&#65039; Instellen mislukte.'); }
 }
 
+// ============ KAARTONTWERP (visuele editor) ============
+// Schaalmodel: 5 px per mm, kaart is 85 x 54 mm -> canvas 425 x 270 px.
+// Let op: sleep-logica gebruikt pointerdown/move/up (GEEN native HTML5
+// drag-and-drop) omdat die laatste onbetrouwbaar is in de Tauri WebView2
+// (zie CLAUDE.md "geleerde lessen"). Pointer-events werken wel betrouwbaar.
+const KO_PX_PER_MM = 5;
+let koLayout = null;      // huidige (evt. nog niet bewaarde) waarden
+let koGesleeptBox = null; // 'qr' | 'naam' | null
+
+async function laadKaartOntwerp(){
+  try{
+    koLayout = await dbHaalKaartLayout() || {};
+  }catch(e){ console.error('Kaartontwerp laden mislukte:',e); toon('&#9888;&#65039; Kaartontwerp laden mislukte.'); return; }
+  // Standaardwaarden als er (nog) niets bewaard is.
+  koLayout = Object.assign({
+    achtergrond_data:null, qr_x:8, qr_y:10, qr_grootte:34,
+    naam_x:48, naam_y:26, naam_lettergrootte:15,
+    ondertitel:'Rising You — lidkaart', ondertitel_y:33,
+  }, koLayout);
+
+  document.getElementById('ko-qr-x').value=koLayout.qr_x;
+  document.getElementById('ko-qr-y').value=koLayout.qr_y;
+  document.getElementById('ko-qr-grootte').value=koLayout.qr_grootte;
+  document.getElementById('ko-naam-x').value=koLayout.naam_x;
+  document.getElementById('ko-naam-y').value=koLayout.naam_y;
+  document.getElementById('ko-naam-lettergrootte').value=koLayout.naam_lettergrootte;
+  document.getElementById('ko-ondertitel').value=koLayout.ondertitel;
+  document.getElementById('ko-ondertitel-y').value=koLayout.ondertitel_y;
+
+  const canvas=document.getElementById('ko-canvas');
+  canvas.style.backgroundImage = koLayout.achtergrond_data ? 'url('+koLayout.achtergrond_data+')' : 'none';
+
+  koTekenBoxenVanuitLayout();
+}
+
+// Zet de box-posities/groottes (px) op basis van koLayout (mm).
+function koTekenBoxenVanuitLayout(){
+  const canvas=document.getElementById('ko-canvas');
+  const qr=document.getElementById('ko-box-qr');
+  const naam=document.getElementById('ko-box-naam');
+
+  const qrPx = koLayout.qr_grootte*KO_PX_PER_MM;
+  qr.style.left=(koLayout.qr_x*KO_PX_PER_MM)+'px';
+  qr.style.top=(koLayout.qr_y*KO_PX_PER_MM)+'px';
+  qr.style.width=qrPx+'px';
+  qr.style.height=qrPx+'px';
+
+  const naamLeft=koLayout.naam_x*KO_PX_PER_MM;
+  naam.style.left=naamLeft+'px';
+  naam.style.top=(koLayout.naam_y*KO_PX_PER_MM-16)+'px'; // -16: doc.text() y is de tekstbasislijn, box toont er iets boven
+  naam.style.width=Math.max(40, canvas.clientWidth-naamLeft-8)+'px';
+  naam.style.height='46px';
+
+  document.getElementById('ko-naam-preview').style.fontSize=Math.round(koLayout.naam_lettergrootte*1.15)+'px';
+  document.getElementById('ko-ondertitel-preview').textContent=koLayout.ondertitel;
+}
+
+// Leest de numerieke velden, past koLayout aan en tekent de boxen opnieuw.
+function koVeldenGewijzigd(){
+  koLayout.qr_x=parseFloat(document.getElementById('ko-qr-x').value)||0;
+  koLayout.qr_y=parseFloat(document.getElementById('ko-qr-y').value)||0;
+  koLayout.qr_grootte=parseFloat(document.getElementById('ko-qr-grootte').value)||1;
+  koLayout.naam_x=parseFloat(document.getElementById('ko-naam-x').value)||0;
+  koLayout.naam_y=parseFloat(document.getElementById('ko-naam-y').value)||0;
+  koLayout.naam_lettergrootte=parseFloat(document.getElementById('ko-naam-lettergrootte').value)||1;
+  koLayout.ondertitel=document.getElementById('ko-ondertitel').value;
+  koLayout.ondertitel_y=parseFloat(document.getElementById('ko-ondertitel-y').value)||0;
+  koTekenBoxenVanuitLayout();
+}
+
+// Na het slepen: box-pixelpositie terugrekenen naar mm en de velden bijwerken.
+function koBoxNaarVelden(welke){
+  const canvas=document.getElementById('ko-canvas');
+  const el=document.getElementById('ko-box-'+welke);
+  const links=parseFloat(el.style.left)/KO_PX_PER_MM;
+  const boven=parseFloat(el.style.top)/KO_PX_PER_MM;
+  if(welke==='qr'){
+    koLayout.qr_x=Math.round(links*10)/10; koLayout.qr_y=Math.round(boven*10)/10;
+    document.getElementById('ko-qr-x').value=koLayout.qr_x;
+    document.getElementById('ko-qr-y').value=koLayout.qr_y;
+  } else {
+    koLayout.naam_x=Math.round(links*10)/10;
+    koLayout.naam_y=Math.round((boven+16/KO_PX_PER_MM)*10)/10; // +16px-equivalent: omgekeerde van de -16 hierboven
+    document.getElementById('ko-naam-x').value=koLayout.naam_x;
+    document.getElementById('ko-naam-y').value=koLayout.naam_y;
+  }
+}
+
+// Sleep-logica op basis van pointer-events (zie opmerking hierboven).
+function koMaakSleepbaar(boxEl, welke){
+  let bezig=false, startX=0, startY=0, startLeft=0, startTop=0;
+  boxEl.addEventListener('pointerdown', e=>{
+    bezig=true; koGesleeptBox=welke;
+    try{ boxEl.setPointerCapture(e.pointerId); }catch(err){}
+    startX=e.clientX; startY=e.clientY;
+    startLeft=parseFloat(boxEl.style.left)||0;
+    startTop=parseFloat(boxEl.style.top)||0;
+  });
+  boxEl.addEventListener('pointermove', e=>{
+    if(!bezig) return;
+    const canvas=document.getElementById('ko-canvas');
+    let nieuwLeft=startLeft+(e.clientX-startX);
+    let nieuwTop=startTop+(e.clientY-startY);
+    nieuwLeft=Math.max(0, Math.min(nieuwLeft, canvas.clientWidth-boxEl.offsetWidth));
+    nieuwTop=Math.max(0, Math.min(nieuwTop, canvas.clientHeight-boxEl.offsetHeight));
+    boxEl.style.left=nieuwLeft+'px';
+    boxEl.style.top=nieuwTop+'px';
+    koBoxNaarVelden(welke);
+  });
+  const stop=e=>{ if(!bezig)return; bezig=false; koGesleeptBox=null; try{boxEl.releasePointerCapture(e.pointerId);}catch(err){} };
+  boxEl.addEventListener('pointerup', stop);
+  boxEl.addEventListener('pointercancel', stop);
+}
+koMaakSleepbaar(document.getElementById('ko-box-qr'), 'qr');
+koMaakSleepbaar(document.getElementById('ko-box-naam'), 'naam');
+['ko-qr-x','ko-qr-y','ko-qr-grootte','ko-naam-x','ko-naam-y','ko-naam-lettergrootte','ko-ondertitel','ko-ondertitel-y']
+  .forEach(id=>document.getElementById(id).addEventListener('input', koVeldenGewijzigd));
+
+document.getElementById('ko-achtergrond-input').addEventListener('change', e=>{
+  const bestand=e.target.files[0];
+  if(!bestand) return;
+  const lezer=new FileReader();
+  lezer.onload=()=>{
+    koLayout.achtergrond_data=lezer.result;
+    document.getElementById('ko-canvas').style.backgroundImage='url('+lezer.result+')';
+  };
+  lezer.readAsDataURL(bestand);
+});
+function verwijderKaartAchtergrond(){
+  koLayout.achtergrond_data=null;
+  document.getElementById('ko-canvas').style.backgroundImage='none';
+  document.getElementById('ko-achtergrond-input').value='';
+}
+async function bewaarKaartLayoutDb(){
+  koVeldenGewijzigd();
+  try{
+    await dbBewaarKaartLayout(koLayout, HUIDIGE_MEDEWERKER_ID);
+    toon('&#9989; Kaartontwerp opgeslagen');
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Opslaan mislukte.'); }
+}
+
 // ============ WIJZIGINGEN ============
 let wijzigingen=[];   // wordt uit de database geladen (fn_recente_wijzigingen)
 
@@ -776,6 +962,8 @@ Object.assign(window, {
   // medewerkers
   laadMedewerkersBeheer, maakMedewerkerDb, toggleAdminDb, deactiveerMedewerkerDb,
   openWachtwoord, sluitWachtwoord, bewaarWachtwoord,
+  // kaartontwerp
+  verwijderKaartAchtergrond, bewaarKaartLayoutDb,
   // admin
   adminUitloggen,
 });
