@@ -585,9 +585,22 @@ async function toggleSociaalDb(){
 
 // Opent het "Tegoed toevoegen"-scherm (beurtenkaart + abonnement in één modal
 // i.p.v. een altijd-zichtbaar blok, om het overzicht compacter te houden).
-// Onthoudt de zonet aangemaakte kaart/abonnement zodat "Ongedaan maken" enkel
-// die ene, net toegevoegde rij weer verwijdert (niet een willekeurige oudere).
-let laatsteBeurtenkaartId=null, laatsteAbonnementId=null;
+// Onthoudt élke zonet aangemaakte kaart/abonnement als een stapel (laatst
+// toegevoegd = eerst ongedaan te maken), zodat bv. drie keer per ongeluk
+// toevoegen ook drie keer ongedaan gemaakt kan worden — tot de oorspronkelijke
+// staat weer bereikt is.
+let beurtenkaartStapel=[], abonnementStapel=[];
+
+function tgWerkOngedaanKnopBij(){
+  const bk=document.getElementById('tg-beurten-ongedaan');
+  bk.style.display = beurtenkaartStapel.length>0 ? 'block' : 'none';
+  bk.querySelector('button').innerHTML = '<span class="sym">&#8617;&#65039;</span> Ongedaan maken'
+    + (beurtenkaartStapel.length>1 ? ' ('+beurtenkaartStapel.length+'x)' : '');
+  const ab=document.getElementById('tg-abo-ongedaan');
+  ab.style.display = abonnementStapel.length>0 ? 'block' : 'none';
+  ab.querySelector('button').innerHTML = '<span class="sym">&#8617;&#65039;</span> Ongedaan maken'
+    + (abonnementStapel.length>1 ? ' ('+abonnementStapel.length+'x)' : '');
+}
 
 function openTegoedModal(){
   if(!huidigLid) return;
@@ -596,9 +609,8 @@ function openTegoedModal(){
   document.getElementById('tg-aantal').value=10;
   document.getElementById('tg-aftrek-aantal').value=1;
   document.getElementById('tg-tarief-info').textContent = huidigLid.tarieftype_effectief || '?';
-  laatsteBeurtenkaartId=null; laatsteAbonnementId=null;
-  document.getElementById('tg-beurten-ongedaan').style.display='none';
-  document.getElementById('tg-abo-ongedaan').style.display='none';
+  beurtenkaartStapel=[]; abonnementStapel=[];
+  tgWerkOngedaanKnopBij();
   document.getElementById('tg-aftrek-blok').style.display = isAdmin() ? 'block' : 'none';
   document.getElementById('overlay-tegoed').classList.add('open');
 }
@@ -613,9 +625,10 @@ async function voegBeurtenkaartToe(){
   if(!aantal || aantal<1){ toon('&#9888;&#65039; Geef een geldig aantal beurten.'); return; }
   try{
     // tarief null => database gebruikt het tarieftype van het lid
-    laatsteBeurtenkaartId = await dbLaadBeurtenkaart(huidigLid.id, aantal, act, null, HUIDIGE_MEDEWERKER_ID);
+    const nieuwId = await dbLaadBeurtenkaart(huidigLid.id, aantal, act, null, HUIDIGE_MEDEWERKER_ID);
+    beurtenkaartStapel.push(nieuwId);
     toon('&#10003; Beurtenkaart toegevoegd: '+aantal+' '+activiteitNaam(act));
-    document.getElementById('tg-beurten-ongedaan').style.display='block';
+    tgWerkOngedaanKnopBij();
     huidigLid = await dbHaalLid(huidigLid.id);
     tekenLeden(); tekenDetail();
   }catch(e){ console.error(e); toon('&#9888;&#65039; Toevoegen mislukte.'); }
@@ -627,36 +640,40 @@ async function voegAbonnementToe(){
   const duur=document.getElementById('tg-duur').value;
   const vandaag=new Date().toISOString().slice(0,10);
   try{
-    laatsteAbonnementId = await dbLaadAbonnement(huidigLid.id, duur, vandaag, act, null, HUIDIGE_MEDEWERKER_ID);
+    const nieuwId = await dbLaadAbonnement(huidigLid.id, duur, vandaag, act, null, HUIDIGE_MEDEWERKER_ID);
+    abonnementStapel.push(nieuwId);
     toon('&#10003; Abonnement toegevoegd: '+activiteitNaam(act));
-    document.getElementById('tg-abo-ongedaan').style.display='block';
+    tgWerkOngedaanKnopBij();
     huidigLid = await dbHaalLid(huidigLid.id);
     tekenLeden(); tekenDetail();
   }catch(e){ console.error(e); toon('&#9888;&#65039; Toevoegen mislukte.'); }
 }
 
-// "Ongedaan maken": beschikbaar voor elke medewerker, enkel voor de zonet
-// zelf toegevoegde kaart/abonnement in deze modal-sessie.
+// "Ongedaan maken": beschikbaar voor elke medewerker, maakt telkens de meest
+// recente, nog niet ongedaan gemaakte toevoeging in deze modal-sessie ongedaan
+// (laatst-toegevoegd-eerst-ongedaan, net als de stapel waarop toegevoegd is).
 async function annuleerLaatsteBeurtenkaart(){
-  if(!huidigLid || !laatsteBeurtenkaartId) return;
+  if(!huidigLid || beurtenkaartStapel.length===0) return;
+  const id=beurtenkaartStapel[beurtenkaartStapel.length-1];
   try{
-    const r = await dbAnnuleerBeurtenkaart(laatsteBeurtenkaartId, HUIDIGE_MEDEWERKER_ID);
+    const r = await dbAnnuleerBeurtenkaart(id, HUIDIGE_MEDEWERKER_ID);
     if(r && r!=='ok'){ toon('&#9888;&#65039; '+r); return; }
+    beurtenkaartStapel.pop();
     toon('&#8617;&#65039; Beurtenkaart ongedaan gemaakt');
-    laatsteBeurtenkaartId=null;
-    document.getElementById('tg-beurten-ongedaan').style.display='none';
+    tgWerkOngedaanKnopBij();
     huidigLid = await dbHaalLid(huidigLid.id);
     tekenLeden(); tekenDetail();
   }catch(e){ console.error(e); toon('&#9888;&#65039; Ongedaan maken mislukte.'); }
 }
 async function annuleerLaatsteAbonnement(){
-  if(!huidigLid || !laatsteAbonnementId) return;
+  if(!huidigLid || abonnementStapel.length===0) return;
+  const id=abonnementStapel[abonnementStapel.length-1];
   try{
-    const r = await dbAnnuleerAbonnement(laatsteAbonnementId, HUIDIGE_MEDEWERKER_ID);
+    const r = await dbAnnuleerAbonnement(id, HUIDIGE_MEDEWERKER_ID);
     if(r && r!=='ok'){ toon('&#9888;&#65039; '+r); return; }
+    abonnementStapel.pop();
     toon('&#8617;&#65039; Abonnement ongedaan gemaakt');
-    laatsteAbonnementId=null;
-    document.getElementById('tg-abo-ongedaan').style.display='none';
+    tgWerkOngedaanKnopBij();
     huidigLid = await dbHaalLid(huidigLid.id);
     tekenLeden(); tekenDetail();
   }catch(e){ console.error(e); toon('&#9888;&#65039; Ongedaan maken mislukte.'); }
