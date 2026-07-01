@@ -21,7 +21,8 @@ De gebruiker (Simon) is een capabele niet-ontwikkelaar. Leg keuzes duidelijk uit
   - **Ctrl+R** herlaadt de JS (volstaat voor de meeste wijzigingen).
   - Wijzigingen aan **module-niveau `await`** of aan `tauri.conf.json` vereisen een **volledige herstart** (Ctrl+C, opnieuw `npm run tauri:dev`).
 - Supabase-project: `https://agdjqrduzhywzltxurae.supabase.co` (regio Frankfurt, eu-central-1, GDPR). Anon key staat in de client en is veilig by design (zie beveiliging).
-- Supabase CLI: handmatig geïnstalleerd als `.exe` in `C:\Users\simon\supabase`, met dat pad in de Windows-PATH. Migraties via `supabase db push` (migraties 0001–0010 toegepast). **Let op:** veel recente DB-functies zijn rechtstreeks via de SQL-editor aangemaakt, niet altijd als migratiebestand — controleer of de repo-migraties overeenkomen met de live database voor je nieuwe migraties schrijft.
+- Supabase CLI: staat als `supabase` in de Windows-PATH (via scoop). Migraties via `supabase db push` (migraties 0001–0011 toegepast, repo en live database lopen weer gelijk sinds migratie 0011).
+- **Docker is niet geïnstalleerd** op deze machine. `supabase db pull`/`db diff`/`db dump` werken daardoor niet (ze hebben een gedockerde shadow-database nodig). Schema rechtstreeks inspecteren kan wel zonder Docker via `supabase db query --linked "<sql>"` (gaat via de Management API, geen wachtwoord nodig).
 
 ---
 
@@ -79,11 +80,13 @@ Kwetsbare doelgroep. Minimale data. Opgeslagen: voornaam, achternaam, **geboorte
 
 **Claude Code beheert de database via de Supabase CLI en migratiebestanden — niet via handmatig geplakte SQL.** Elke DB-wijziging wordt een migratiebestand in `supabase/migrations/` en gaat via `supabase db push` naar de live database. Zo blijft de database reproduceerbaar en versiebeheerd.
 
-### ⚠️ EERST DOEN vóór welke nieuwe migratie dan ook — live/repo-drift oplossen
-De live database en de migratiemappen lopen **niet gelijk**. Veel functies uit de recentste sessies zijn rechtstreeks via de Supabase SQL-editor aangemaakt en zijn **niet** als migratie bewaard (de repo heeft migraties 0001–0010, de live DB heeft méér). Voordat je nieuwe migraties toevoegt:
-1. Inventariseer het verschil. Draai `supabase db diff` (of `supabase db pull`) om de huidige live staat te vergelijken met de migraties. Bekijk welke functies/kolommen live bestaan maar niet in de migraties staan (o.a. alle `fn_*` uit de functielijst hieronder, de `gratis`-kolom op `activiteiten`, de pgcrypto-extensie, `wachtwoord_hash`).
-2. Leg die live staat vast in een nieuwe "baseline"-migratie (bv. `supabase db pull` genereert er een), zodat repo en live weer gelijklopen.
-3. Pas **daarna** pas nieuwe wijzigingen toe als aparte migraties.
+### ✅ OPGELOST (2026-07-01): live/repo-drift baseline
+Migratie `0011_baseline_live_functies.sql` legt 22 functies + de `gratis`-kolom op `activiteiten` vast die eerder rechtstreeks via de SQL-editor waren aangemaakt. Repo en live database lopen nu gelijk (`supabase_migrations.schema_migrations` bevat 0001–0011). **Docker ontbreekt op deze machine**, dus dit is manueel gedaan via `supabase db query --linked` (pg_proc/information_schema introspectie + `pg_get_functiondef`) in plaats van `supabase db pull` — hou daar rekening mee bij toekomstige drift-checks; zie hierboven bij "Supabase CLI".
+
+Werkwijze voor nieuwe migraties vanaf nu:
+1. Check bij twijfel of iets al leeft via `supabase db query --linked "<sql>"` (bv. `select proname from pg_proc ...`) vóór je een nieuwe migratie schrijft.
+2. Schrijf de wijziging als migratiebestand.
+3. Toon de SQL aan Simon, vraag bevestiging, dan pas `supabase db push`.
 
 **NOOIT `supabase db reset` op de live database** — dat gooit data weg (persoonsgegevens!). Reset hoogstens tegen een lokale dev-database.
 
@@ -138,6 +141,8 @@ Elk scherm koppelt HTML-`onclick`-handlers aan functies via `Object.assign(windo
 
 **Medewerkers (admin)**: `fn_actieve_medewerkers()`, `fn_alle_medewerkers()` (incl. `heeft_wachtwoord`), `fn_maak_medewerker(text,text,boolean,uuid)`, `fn_deactiveer_medewerker(uuid,uuid)` (beschermt laatste actieve admin), `fn_zet_admin_rechten(uuid,boolean,uuid)` (beschermt laatste actieve admin), `fn_zet_admin_wachtwoord(uuid,text)` (bcrypt, search_path incl. extensions), `fn_check_admin_login(uuid,text)→boolean` (checkt actief + is_admin + bcrypt-match, search_path incl. extensions).
 
+**Offline-cache (kassa)**: `fn_cache_leden()` — minimale ledenlijst incl. geldig QR-token, gebruikt door `vulCache()` in `databron.js` zodat de kassa kan doorwerken bij internetverlies.
+
 **Enums**: `goedkeuring` = {nieuw, goedgekeurd, afgewezen}. Verder o.a. `tarieftype`, `toewijzing_type`, `abonnement_duur`.
 
 **Testdata**: medewerkers `...b1` Lana (admin, **heeft wachtwoord**), `...b2` Sara, `...b3` Mehmet, `...b4` Joke. Leden `...0001`–`0009`. Clubsessies `...00c1` (Klimclub/klimmen), `...00c2` (Yoga), `...00c3` (We Workout), elk met momenten voor alle weekdagen.
@@ -152,10 +157,9 @@ Net afgerond en volledig werkend tegen de database:
 - Admin portaal: sessiebeheer, activiteitenbeheer (incl. gratis/betalend bewerken), recente wijzigingen (sorteert recentste eerst, logt "van X naar Y"), accounts goedkeuren/afwijzen.
 - Medewerker-selectie gekoppeld; logging registreert de juiste medewerker; admin-rechten via `is_admin`.
 - pgcrypto aan; `fn_zet_admin_wachtwoord` en `fn_check_admin_login` werken (Lana heeft een wachtwoord).
+- **(2026-07-01)** DB-drift opgelost: migratie `0011_baseline_live_functies.sql` gepusht, repo en live database lopen weer gelijk (zie "Database-werkwijze" hierboven).
 
 ### DIRECT OPENSTAAND — hier zijn we mee bezig
-
-0. **[EERST — DB-drift oplossen]** Zie "Database-werkwijze" hierboven. De live database bevat functies die nog niet als migratie in de repo staan. Voordat er nieuwe DB-wijzigingen komen: leg de huidige live staat vast als baseline-migratie (`supabase db pull`/`db diff`), zodat repo en live gelijklopen. Pas dit één keer toe, dan is de rest van het werk schoon.
 
 1. **[NET GEBOUWD, MOET NOG GETEST] Medewerkersbeheer in het admin portaal.** Nieuw tabblad "Medewerkers": lijst, toevoegen (voornaam/achternaam/admin-switch), admin-rechten togglen, wachtwoord instellen (popup), deactiveren. Beschermt de laatste actieve admin. databron-functies toegevoegd: `alleMedewerkers`, `maakMedewerker`, `deactiveerMedewerker`, `zetAdminRechten`, `zetAdminWachtwoord`, `checkAdminLogin`.
    - **Bug die net is opgelost**: bij het toevoegen van het medewerkers-paneel was per ongeluk het volledige `paneel-activiteiten` overschreven, waardoor Activiteiten én Medewerkers een leeg scherm gaven (`toonPaneel` crashte op het ontbrekende element). Het activiteiten-paneel is teruggezet. Geverifieerd dat alle 5 panelen (`sessies, wijzigingen, accounts, activiteiten, medewerkers`) en bijbehorende `st-`tabs nu bestaan.
