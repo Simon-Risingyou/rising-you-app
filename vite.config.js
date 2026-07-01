@@ -13,6 +13,9 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    watch: {
+      ignored: ['**/src-tauri/**'],
+    },
   },
   // Voorkom dat Vite de env-variabelen weggooit die Tauri nodig heeft.
   envPrefix: ['VITE_', 'TAURI_'],

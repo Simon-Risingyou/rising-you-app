@@ -54,12 +54,14 @@
   .wachtlijst{display:flex;flex-direction:column;gap:11px;min-height:60px}
   .leeg{color:var(--grijs);text-align:center;padding:22px;font-size:15px}
   .wachtkaart{border:2px solid var(--lijn);border-radius:14px;padding:12px;display:flex;gap:11px;align-items:flex-start;background:var(--wit);position:relative}
+  .wachtkaart.pakbaar{cursor:pointer}
+  .wachtkaart.pakbaar:hover{border-color:var(--blauw)}
+  .wachtkaart.gepakt{border-color:var(--blauw);box-shadow:0 0 0 3px var(--blauw-licht);background:var(--blauw-licht)}
   .wachtkaart.groen{border-left:8px solid var(--groen);background:var(--groen-licht)}
   .wachtkaart.rood{border-left:8px solid var(--rood);background:var(--rood-licht)}
   .wachtkaart.oranje{border-left:8px solid var(--oranje);background:var(--oranje-licht)}
   .wachtkaart.paars{border-left:8px solid var(--paars);background:var(--paars-licht)}
   .wachtkaart.info{border-left:8px solid var(--blauw);background:var(--blauw-licht)}
-  .wachtkaart[draggable=true]{cursor:grab}
   .fotomini{width:50px;height:50px;border-radius:10px;background:#eceae3;display:flex;align-items:center;justify-content:center;font-size:22px;color:var(--grijs);flex-shrink:0;overflow:hidden}
   .wk-info{flex:1;min-width:0}
   .wk-info .naam{font-size:18px;font-weight:700}
@@ -120,6 +122,11 @@
   .sessie.club{border-color:var(--paars)}
   .sessie.over{background:var(--blauw-licht);border-style:solid}
   .sessie.club.over{background:var(--paars-licht)}
+  /* aantik-methode: als er een kaart 'gepakt' is, lichten de sessies op als doel */
+  .sessie.kies{border-style:solid;cursor:pointer;box-shadow:0 0 0 3px var(--blauw-licht)}
+  .sessie.kies:hover{background:var(--blauw-licht)}
+  .sessie.club.kies{box-shadow:0 0 0 3px var(--paars-licht)}
+  .sessie.club.kies:hover{background:var(--paars-licht)}
   .toegewezen{font-size:14px;padding:7px 10px;border-radius:10px;margin-top:6px;display:flex;align-items:center;gap:6px}
   .sessie.los .toegewezen{background:var(--blauw-licht);color:var(--blauw)}
   .sessie.club .toegewezen{background:var(--paars-licht);color:var(--paars)}
@@ -154,7 +161,7 @@
     <a class="tab admin-tab" id="admin-portaal-tab" href="#" onclick="window.location.href='admin-portaal.html';return false" style="display:none">&#128273; Admin portaal</a>
   </div>
   <div class="medewerker"><span class="sym">&#128100;</span><span>Wie werkt nu?</span>
-    <select id="medewerker" onchange="medewerkerGewijzigd()"><option>Sara</option><option>Mehmet</option><option>Joke</option><option>Lana (admin)</option></select>
+    <select id="medewerker" onchange="medewerkerGewijzigd()"></select>
     <button class="knop knop-grijs" id="admin-knop" style="font-size:14px;padding:8px 12px" onclick="adminKnopActie()"><span class="sym">&#128274;</span> Admin login</button>
   </div>
 </div>
@@ -243,11 +250,34 @@
     <h3 style="font-size:20px;margin-bottom:8px;display:flex;align-items:center;gap:8px"><span class="sym">&#129309;</span> Beurt lenen</h3>
     <p style="font-size:15px;color:var(--grijs);margin-bottom:14px" id="leen-uitleg"></p>
     <div id="leen-opties" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
-    <button class="knop knop-grijs" style="width:100%" onclick="leenAnnuleer()">Annuleer (niet lenen)</button>
+    <button class="knop knop-grijs" style="width:100%" onclick="leenAnnuleerDb()">Annuleer (niet lenen)</button>
   </div>
 </div>
 <div class="toast" id="toast"></div>
-<script>
+<script type="module">
+// --- Databasekoppeling ---
+// We importeren de databron-laag. Alle echte datatoegang loopt hierlangs.
+import { verwerkScan as dbVerwerkScan, gezinVanLid, beschikbaarTegoed,
+         leenbareGezinsbeurten, rondWachtkamerAf, vinkAf as dbVinkAf,
+         annuleerCheckin, checkInLid as dbCheckInLid,
+         herstelNaarWachtkamer as dbHerstelNaarWachtkamer,
+         sessiesVandaag as dbSessiesVandaag, haalLid as dbHaalLid,
+         alleActiviteiten as dbAlleActiviteiten,
+         actieveMedewerkers as dbActieveMedewerkers } from './src/lib/databron.js';
+
+// Tijdelijk: vaste medewerker (Sara uit de testdata) tot de echte
+// medewerker-keuze gekoppeld is aan de database-UUID's.
+// De medewerker die nu aan de kassa werkt. Wordt gekozen via de dropdown en
+// bewaard in sessionStorage zodat de keuze meereist tussen de schermen.
+let HUIDIGE_MEDEWERKER_ID = null;
+let MEDEWERKERS = [];
+function leesGekozenMedewerker(){
+  try{ return sessionStorage.getItem('ry_medewerker_id'); }catch(e){ return null; }
+}
+function bewaarGekozenMedewerker(id){
+  try{ sessionStorage.setItem('ry_medewerker_id', id); }catch(e){}
+}
+
 // ===========================================================================
 // LANDEN VAN HERKOMST
 // 'veelvoorkomend' = korte lijst die bovenaan verschijnt. Later kan deze
@@ -318,7 +348,14 @@ function kiesLand(l){
   sluitLandKiezer();
 }
 
-const ACTIVITEITEN=[{code:"klimmen",naam:"Klimmen"},{code:"yoga",naam:"Yoga"},{code:"workout",naam:"We Workout"}];
+// Activiteiten worden uit de database geladen (fn_alle_activiteiten).
+let ACTIVITEITEN=[{code:"klimmen",naam:"Klimmen"},{code:"yoga",naam:"Yoga"},{code:"workout",naam:"We Workout"}];
+async function laadActiviteitenLijst(){
+  try{
+    const lijst = await dbAlleActiviteiten() || [];
+    if(lijst.length>0) ACTIVITEITEN = lijst.map(a=>({code:a.code, naam:a.naam, gratis:a.gratis}));
+  }catch(e){ console.error('Activiteiten laden mislukte:',e); }
+}
 const leden = {
   "RY-guy":   {id:"guy",   voornaam:"Guy",   achternaam:"Janssens",sociaal:false, nieuw:false, jaar:1985, postcode:"2018", herkomst:"Belgi\u00eb",  gezinId:"g1", gezinRol:"voogd", tariefHandmatig:null,
     beurtenkaarten:[{activiteit:"klimmen",tarief:"volwassene",beurten:12}], abonnementen:[{activiteit:"yoga",tarief:"volwassene",tot:"2026-12-31"}]},
@@ -338,14 +375,27 @@ const leden = {
 const gezinnen={ "g1":{id:"g1",naam:"Gezin Janssens"} };
 // Clubsessies hebben een vaste activiteit (admin kiest die) en weekdagen waarop
 // ze actief zijn (0=zondag..6=zaterdag). De check-in toont enkel sessies van vandaag.
-const clubsessies=[
-  {id:"club-klim", naam:"Klimclub", activiteit:"klimmen", weekdagen:[2,4]},   // di + do
-  {id:"club-yoga", naam:"Yoga",     activiteit:"yoga",    weekdagen:[3]},      // wo
-  {id:"club-workout", naam:"We Workout", activiteit:"workout", weekdagen:[1,5]}, // ma + vr
-];
-function sessiesVandaag(){
-  const dag=new Date().getDay();
-  return clubsessies.filter(c=>c.weekdagen.includes(dag));
+// Clubsessies van vandaag. Wordt gevuld uit de database (fn_momenten_van_dag)
+// bij het opstarten via laadSessies(). Tot dan leeg.
+let clubsessies=[];
+function sessiesVandaag(){ return clubsessies; }
+
+// Haal de echte clubsessies van vandaag op en teken de sessievakken opnieuw.
+async function laadSessies(){
+  try{
+    const momenten = await dbSessiesVandaag();   // [{moment_id, clubsessie_id, naam, activiteit, start_tijd, eind_tijd}]
+    clubsessies = (Array.isArray(momenten)?momenten:[]).map(m=>({
+      id: m.moment_id,            // uniek per moment (voor de frontend-lijst)
+      dbId: m.clubsessie_id,      // de echte clubsessie-UUID (gaat naar de database)
+      naam: m.naam,
+      activiteit: m.activiteit,
+      start: m.start_tijd, eind: m.eind_tijd,
+    }));
+  }catch(e){
+    console.error('Kon clubsessies niet laden:', e);
+    clubsessies = [];
+  }
+  tekenSessies();
 }
 
 function tariefVan(l){
@@ -362,6 +412,7 @@ function beurtenVoor(l,act){return (l.beurtenkaarten||[]).filter(k=>k.activiteit
 function eersteBeurtkaart(l,act){return (l.beurtenkaarten||[]).find(k=>k.activiteit===act && k.beurten>0)||null;}
 const ledenById={}; Object.entries(leden).forEach(([k,l])=>{l.sleutel=k; ledenById[l.id]=l;});
 let wachtId=0, nieuwTeller=0;
+let gepakteKaartId=null;   // welke wachtkaart is 'opgepakt' om te plaatsen (aantik-methode)
 const wachtenden={}, dagcheckins=[];
 const demorij=document.getElementById('demorij');
 Object.values(leden).forEach(l=>{const b=document.createElement('button');b.textContent=l.voornaam;b.onclick=()=>{const vensterOpen=document.querySelector('.overlay.open')!==null;verwerkScanCode(l.sleutel,vensterOpen);};demorij.appendChild(b);});
@@ -447,12 +498,81 @@ function toonScanMelding(naam){
 // De scan-balk zelf: gewoon Enter verwerkt de ingetypte/gescande code.
 document.getElementById('scaninput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();verwerkScan();}});
 function piep(){try{const c=new(window.AudioContext||window.webkitAudioContext)();const o=c.createOscillator(),g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=880;g.gain.value=.15;o.start();setTimeout(()=>{o.stop();c.close();},120);}catch(e){}}
-function verwerkScan(){
+async function verwerkScan(){
   const sleutel=document.getElementById('scaninput').value.trim();
   document.getElementById('scaninput').value=''; document.getElementById('scaninput').focus();
-  const lid=leden[sleutel];
-  if(!lid){toon('&#10060; Kaartje niet herkend. Vraag hulp aan een medewerker.');return;}
-  piep(); checkInLid(lid,'check_in');
+  if(!sleutel) return;
+  try{
+    // Vraag de database om het kaartje te verwerken.
+    const res = await dbVerwerkScan(sleutel, HUIDIGE_MEDEWERKER_ID);
+    // res komt van fn_verwerk_scan: { checkin_id, lid_id, voornaam, achternaam,
+    //   foto_pad, sociaal_tarief, resultaat, beurten_resterend, abonnement_geldig,
+    //   abonnement_tot, moet_akaart, gevonden }  (eventueel verpakt door de RPC)
+    const r = Array.isArray(res) ? res[0] : res;
+    if(!r || r.gevonden===false){
+      toon('&#10060; Kaartje niet herkend. Vraag hulp aan een medewerker.');
+      return;
+    }
+    piep();
+    // Haal de gezinsleden op (voor de aanvinkbare opties in de wachtkamer).
+    let gezinsleden=[];
+    try{
+      const gezin = await gezinVanLid(r.lid_id);
+      if(Array.isArray(gezin)){
+        gezinsleden = gezin.map(g=>({lidId:g.lid_id, naam:g.voornaam, rol:g.rol, aangevinkt:false, betaalwijze:null}));
+      }
+    }catch(e){ /* geen gezin of fout: gewoon zonder gezinsleden verder */ }
+
+    // Tegoed per activiteit ophalen voor de hoofdpersoon én de gezinsleden,
+    // en bewaren in een cache. De wachtkamer tekent daaruit (snel, geen herhaalde db-calls).
+    const tegoedCache = {};
+    const alleIds = [r.lid_id, ...gezinsleden.map(g=>g.lidId)];
+    await Promise.all(alleIds.map(async (pid)=>{
+      tegoedCache[pid] = {};
+      await Promise.all(ACTIVITEITEN.map(async (act)=>{
+        try{
+          const t = await beschikbaarTegoed(pid, act.code);
+          // t = { abonnement_geldig, abonnement_tot, beurten, beurtenkaart_id }
+          tegoedCache[pid][act.code] = {
+            abo: !!t?.abonnement_geldig,
+            aboTot: t?.abonnement_tot ?? null,
+            beurten: t?.beurten ?? 0,
+            kaartId: t?.beurtenkaart_id ?? null,
+          };
+        }catch(e){
+          tegoedCache[pid][act.code] = { abo:false, aboTot:null, beurten:0, kaartId:null };
+        }
+      }));
+    }));
+
+    // Bouw een lid-object zoals checkInLid het verwacht.
+    const lid={
+      id:r.lid_id, voornaam:r.voornaam, achternaam:r.achternaam,
+      sociaal:r.sociaal_tarief, nieuw:false,
+      gezinId: gezinsleden.length>0 ? 'db' : null, gezinRol:null,
+    };
+    checkInLidDb(lid, gezinsleden, 'check_in', r.checkin_id, tegoedCache);
+  }catch(e){
+    console.error('Scan-fout:', e);
+    toon('&#9888;&#65039; Probleem bij het scannen. Probeer opnieuw.');
+  }
+}
+
+// Variant van checkInLid die kant-en-klare gezinsleden meekrijgt (uit de database).
+function checkInLidDb(lid, gezinsleden, soort, checkinId, tegoedCache){
+  const id=++wachtId;
+  const w={id,lidId:lid.id,naam:lid.voornaam+' '+lid.achternaam,sociaal:lid.sociaal,nieuw:lid.nieuw,
+    soort,
+    betaalwijze:null,
+    akaart:(lid.sociaal&&soort==='check_in')?false:null,
+    sessie:null,sessieAct:null,geannuleerd:false,tijd:nu(),wie:medewerker(),
+    gezinsleden, hoofdMee:true, afgetrokken:[],
+    // database-koppeling:
+    dbCheckinId: checkinId,            // id van deze check-in in de database
+    tegoed: tegoedCache || {},         // tegoed per persoon per activiteit (cache)
+  };
+  wachtenden[id]=w; dagcheckins.push(w);
+  tekenWachtkamer(); tekenDag();
 }
 function checkInLid(lid,soort){
   const id=++wachtId;
@@ -475,12 +595,23 @@ function checkInLid(lid,soort){
   if(soort==='alleen_info') toon('&#8505;&#65039; '+w.naam+' &#8212; alleen profiel, geen beurt');
 }
 
-// Bepaalt voor een lid + activiteit welke betaalwijze mogelijk is.
-function tegoedStatus(lidId,act){
-  const l=ledenById[lidId];
-  const aboTot=aboTotVoor(l,act);
-  const beurten=beurtenVoor(l,act);
-  return {abo:!!aboTot, aboTot, beurten, heeftTegoed:(!!aboTot||beurten>0)};
+// Tegoed voor een persoon + activiteit, uit de bij de scan opgehaalde cache van
+// deze check-in (w.tegoed). Valt terug op "niets" als het er niet is.
+function tegoedStatus(w, lidId, act){
+  const t = w?.tegoed?.[lidId]?.[act];
+  if(!t) return {abo:false, aboTot:null, beurten:0, kaartId:null, heeftTegoed:false};
+  return {abo:t.abo, aboTot:t.aboTot, beurten:t.beurten, kaartId:t.kaartId, heeftTegoed:(t.abo||t.beurten>0)};
+}
+function tegoedBadgesHtml(w, lidId){
+  let h='<div class="tegoed-rij">';
+  ACTIVITEITEN.filter(act=>!act.gratis).forEach(act=>{
+    const s=tegoedStatus(w, lidId, act.code);
+    if(s.abo) h+='<span class="tegoed-badge abo"><span class="sym">&#128197;</span> '+act.naam+': abo</span>';
+    else if(s.beurten>0) h+='<span class="tegoed-badge beurt">'+act.naam+': '+s.beurten+'</span>';
+    else h+='<span class="tegoed-badge geen">'+act.naam+': 0</span>';
+  });
+  h+='</div>';
+  return h;
 }
 // Is een persoon klaar om te slepen? Bij info nooit. A-Kaart moet ok zijn.
 // De echte tegoed-check gebeurt bij het slepen (hangt af van de sessie-activiteit).
@@ -510,17 +641,6 @@ function kleurVan(w){
   if(!(w.akaart===null||w.akaart===true)) return 'oranje';
   return 'groen';
 }
-function tegoedBadgesHtml(lidId){
-  let h='<div class="tegoed-rij">';
-  ACTIVITEITEN.forEach(act=>{
-    const s=tegoedStatus(lidId,act.code);
-    if(s.abo) h+='<span class="tegoed-badge abo"><span class="sym">&#128197;</span> '+act.naam+': abo</span>';
-    else if(s.beurten>0) h+='<span class="tegoed-badge beurt">'+act.naam+': '+s.beurten+'</span>';
-    else h+='<span class="tegoed-badge geen">'+act.naam+': 0</span>';
-  });
-  h+='</div>';
-  return h;
-}
 function tekenWachtkamer(){
   const lijst=document.getElementById('wachtlijst');
   const open=Object.values(wachtenden).filter(w=>!w.sessie&&!w.geannuleerd);
@@ -528,10 +648,20 @@ function tekenWachtkamer(){
   if(open.length===0){lijst.innerHTML='<div class="leeg">Nog niemand in de wachtkamer.</div>';return;}
   open.forEach(w=>{
     const klaar=klaarVoorSessie(w);
+    const oppakbaar=magOppakken(w);
     const div=document.createElement('div');
-    div.className='wachtkaart '+kleurVan(w);
-    div.draggable=klaar;
-    div.ondragstart=e=>e.dataTransfer.setData('id',w.id);
+    div.className='wachtkaart '+kleurVan(w)+(gepakteKaartId===w.id?' gepakt':'');
+    // Aantikken om te pakken/loslaten. De kaart mag opgepakt worden zodra er
+    // iemand geselecteerd is en de A-Kaart ok is; de betaalwijze is pas nodig
+    // bij het toewijzen aan een BETALENDE sessie (gratis sessies niet).
+    if(oppakbaar){
+      div.classList.add('pakbaar');
+      div.addEventListener('click', (e)=>{
+        // Niet reageren als er op een knop/badge in de kaart geklikt is.
+        if(e.target.closest('button')) return;
+        pakKaart(w.id);
+      });
+    }
     let badge='';
     if(w.soort==='alleen_info') badge='<span class="badge b-blauw"><span class="sym">&#8505;&#65039;</span> Alleen info &#8212; geen beurt</span>';
     else if(w.nieuw) badge='<span class="badge b-paars"><span class="sym">&#10133;</span> Nieuw profiel</span>';
@@ -539,7 +669,7 @@ function tekenWachtkamer(){
     if(w.soort!=='alleen_info' && w.sociaal){
       checks='<div class="checks"><span class="check akaart '+(w.akaart?'aan':'')+'" onclick="vinkAkaart('+w.id+')">'+(w.akaart?'&#9989;':'&#11036;')+' A-Kaart</span></div>';
     }
-    let tegoed = w.soort!=='alleen_info' ? tegoedBadgesHtml(w.lidId) : '';
+    let tegoed = w.soort!=='alleen_info' ? tegoedBadgesHtml(w, w.lidId) : '';
     let gezinHtml='';
     if(w.gezinsleden && w.gezinsleden.length>0){
       gezinHtml='<div class="gezinblok"><div class="gezinkop"><span class="sym">&#128106;</span> Gezin &#8212; wie doet mee?</div>';
@@ -548,7 +678,7 @@ function tekenWachtkamer(){
         +'<span class="gezincheck" onclick="vinkHoofd('+w.id+')">'+(w.hoofdMee?'&#9989;':'&#11036;')+'</span>'
         +'<span class="gezinnaam"><b>'+w.naam.split(' ')[0]+'</b> <span style="font-size:12px;color:var(--grijs)">'+(w.hoofdMee?'(doet mee)':'(checkt alleen kinderen in)')+'</span></span></div>';
       if(w.hoofdMee){
-        gezinHtml+='<div class="gezinsub">'+tegoedBadgesHtml(w.lidId)
+        gezinHtml+='<div class="gezinsub">'+tegoedBadgesHtml(w, w.lidId)
           +'<div class="betaalwijze-rij">'
           +'<button class="bwn'+(w.betaalwijze==='tegoed'?' aan':'')+'" onclick="zetHoofdBetaalwijze('+w.id+',\'tegoed\')">beurt / abo</button>'
           +'<button class="bwn'+(w.betaalwijze==='los'?' aan':'')+'" onclick="zetHoofdBetaalwijze('+w.id+',\'los\')">losse beurt</button>'
@@ -560,7 +690,7 @@ function tekenWachtkamer(){
           +'<span class="gezincheck" onclick="vinkGezinslid('+w.id+','+gi+')">'+(g.aangevinkt?'&#9989;':'&#11036;')+'</span>'
           +'<span class="gezinnaam">'+g.naam+' <span style="font-size:12px;color:var(--grijs)">('+g.rol+')</span></span></div>';
         if(g.aangevinkt){
-          gezinHtml+='<div class="gezinsub">'+tegoedBadgesHtml(g.lidId)
+          gezinHtml+='<div class="gezinsub">'+tegoedBadgesHtml(w, g.lidId)
             +'<div class="betaalwijze-rij">'
             +'<button class="bwn'+(g.betaalwijze==='tegoed'?' aan':'')+'" onclick="zetBetaalwijze('+w.id+','+gi+',\'tegoed\')">beurt / abo</button>'
             +'<button class="bwn'+(g.betaalwijze==='los'?' aan':'')+'" onclick="zetBetaalwijze('+w.id+','+gi+',\'los\')">losse beurt</button>'
@@ -574,7 +704,7 @@ function tekenWachtkamer(){
     }
     const hint=w.soort==='alleen_info'
       ? '<div class="sleep-hint">Klik op &#10005; om te sluiten</div>'
-      : (klaar?'<div class="sleep-hint klaar">&#9989; Sleep naar de juiste sessie &#8594;</div>':'<div class="sleep-hint">'+watOntbreekt(w)+'</div>');
+      : (oppakbaar?'<div class="sleep-hint klaar">&#9989; Tik aan, kies dan een sessie</div>':'<div class="sleep-hint">'+watOntbreektOppakken(w)+'</div>');
     div.innerHTML='<button class="annuleer" title="Annuleer" onclick="annuleer('+w.id+')">&#10005;</button><button class="infoknop" title="Toon gegevens" onclick="toonProfiel(\''+w.lidId+'\')">&#8505;</button><div class="fotomini">&#128100;</div><div class="wk-info"><div class="naam">'+w.naam+'</div>'+(badge?'<div class="wk-status">'+badge+'</div>':'')+tegoed+checks+gezinHtml+hint+'</div>';
     lijst.appendChild(div);
   });
@@ -583,11 +713,17 @@ function vinkGezinslid(wid,gi){const g=wachtenden[wid].gezinsleden[gi];g.aangevi
 function vinkHoofd(wid){const w=wachtenden[wid];w.hoofdMee=!w.hoofdMee;if(!w.hoofdMee)w.betaalwijze=null;tekenWachtkamer();}
 function zetBetaalwijze(wid,gi,wijze){wachtenden[wid].gezinsleden[gi].betaalwijze=wijze;tekenWachtkamer();}
 function zetHoofdBetaalwijze(wid,wijze){wachtenden[wid].betaalwijze=wijze;tekenWachtkamer();}
-function vinkAkaart(id){wachtenden[id].akaart=!wachtenden[id].akaart;tekenWachtkamer();}
-function annuleer(id){const w=wachtenden[id];if(!w)return;w.geannuleerd=true;delete wachtenden[id];tekenWachtkamer();tekenDag();toon('&#8617;&#65039; Check-in geannuleerd');}
-function dragOver(e,el){e.preventDefault();el.classList.add('over');}
-function dragLeave(el){el.classList.remove('over');}
-// Bepaalt het tegoed voor één persoon. Lenen gebeurt apart (async) in drop().
+async function vinkAkaart(id){
+  const w=wachtenden[id]; if(!w) return;
+  w.akaart=!w.akaart; tekenWachtkamer();
+  // Database bijwerken: anders weigert de toewijzing (akaart_ok moet true zijn).
+  if(w.dbCheckinId){
+    try{ await dbVinkAf(w.dbCheckinId, 'akaart', HUIDIGE_MEDEWERKER_ID); }
+    catch(e){ console.error('A-Kaart afvinken in database mislukte:', e); }
+  }
+}
+function annuleer(id){const w=wachtenden[id];if(!w)return;if(gepakteKaartId===id){gepakteKaartId=null;markeerSessies();}w.geannuleerd=true;delete wachtenden[id];tekenWachtkamer();tekenDag();toon('&#8617;&#65039; Check-in geannuleerd');}
+// Bepaalt het tegoed voor één persoon. Lenen gebeurt apart (async) in wijsToe().
 function regelTegoed(persoonId, act, betaalwijze){
   const l=ledenById[persoonId];
   if(betaalwijze==='los') return {ok:true, bron:'los', afboeking:null};
@@ -633,66 +769,167 @@ function vraagLenen(persoon, act, gezinId){
 }
 function leenAnnuleer(){ if(leenResolver){ const r=leenResolver; leenResolver=null; document.getElementById('overlay-lenen').classList.remove('open'); r(null); } }
 
-async function drop(e,doelId){
-  e.preventDefault();document.querySelectorAll('.sessie').forEach(s=>s.classList.remove('over'));
-  const id=e.dataTransfer.getData('id');const w=wachtenden[id];if(!w)return;
-  if(!klaarVoorSessie(w)){toon('&#9888;&#65039; Vink eerst de A-Kaart af');return;}
-  const doel = doelId==='los' ? {naam:'losse klimsessie', activiteit:'klimmen'} : clubsessies.find(c=>c.id===doelId);
+// --- Aantik-methode: pak een kaart, plaats hem dan op een sessie ---
+function pakKaart(id){
+  const w=wachtenden[id]; if(!w) return;
+  // Lichte check om op te pakken: geen info-kaart, A-Kaart ok, en minstens 1 persoon.
+  // De betaalwijze-eis geldt pas bij toewijzen aan een BETALENDE sessie (zie wijsToe).
+  if(!magOppakken(w)){ toon('&#9888;&#65039; '+watOntbreektOppakken(w)); return; }
+  if(gepakteKaartId===id){ gepakteKaartId=null; }   // nogmaals tikken = loslaten
+  else { gepakteKaartId=id; toon('&#128073; Tik nu de juiste sessie aan'); }
+  tekenWachtkamer(); markeerSessies();
+}
+// Mag deze kaart opgepakt worden? (zonder betaalwijze-eis — die hangt af van de sessie)
+function magOppakken(w){
+  if(w.soort==='alleen_info')return false;
+  if(!(w.akaart===null||w.akaart===true))return false;
+  const aantal=(w.hoofdMee!==false?1:0)+(w.gezinsleden||[]).filter(g=>g.aangevinkt).length;
+  return aantal>0;
+}
+function watOntbreektOppakken(w){
+  if(!(w.akaart===null||w.akaart===true)) return 'Vink eerst de A-Kaart af';
+  const aantal=(w.hoofdMee!==false?1:0)+(w.gezinsleden||[]).filter(g=>g.aangevinkt).length;
+  if(aantal===0) return 'Kies minstens 1 persoon';
+  return '';
+}
+// Geef de sessievakken een visuele 'klaar om te plaatsen'-toestand.
+function markeerSessies(){
+  document.querySelectorAll('.sessie').forEach(s=>{
+    if(gepakteKaartId!=null) s.classList.add('kies'); else s.classList.remove('kies');
+  });
+}
+// Wordt aangeroepen als de medewerker een sessie aantikt terwijl er een kaart gepakt is.
+async function kiesSessie(doelId){
+  if(gepakteKaartId==null) return;     // niets gepakt: sessie-klik doet niets
+  const w=wachtenden[gepakteKaartId];
+  gepakteKaartId=null; markeerSessies();
+  if(!w){ tekenWachtkamer(); return; }
+  await wijsToe(w, doelId);
+}
+
+async function wijsToe(w, doelId){
+  document.querySelectorAll('.sessie').forEach(s=>s.classList.remove('over','kies'));
+  if(!w){return;}
+  const doel = doelId==='los' ? {naam:'losse klimsessie', activiteit:'klimmen', toewijzing:'losse_klimsessie', clubsessieId:null}
+                              : clubsessies.find(c=>c.id===doelId);
   if(!doel){toon('&#9888;&#65039; Onbekende sessie');return;}
   const act=doel.activiteit;
-  const l=ledenById[w.lidId];
-  const gezinId=l.gezinId;
-  const personen=[];
-  if(w.hoofdMee!==false){ personen.push({persoonId:w.lidId, naam:w.naam, betaalwijze:w.betaalwijze, isHoofd:true}); }
-  (w.gezinsleden||[]).filter(g=>g.aangevinkt).forEach(g=>personen.push({persoonId:g.lidId, naam:ledenById[g.lidId].voornaam+' '+ledenById[g.lidId].achternaam, betaalwijze:g.betaalwijze, isHoofd:false}));
-  if(personen.length===0){toon('&#9888;&#65039; Kies minstens 1 persoon om in te checken');return;}
-  const zonderKeuze=personen.filter(p=>!p.betaalwijze);
-  if(zonderKeuze.length>0){toon('&#9888;&#65039; Kies een betaalwijze voor: '+zonderKeuze.map(p=>p.naam.split(' ')[0]).join(', '));return;}
+  // Is de gekozen activiteit gratis? Dan geen betaalwijze of A-Kaart nodig.
+  const actInfo = ACTIVITEITEN.find(a=>a.code===act);
+  const isGratis = !!(actInfo && actInfo.gratis);
+  // Bij een betalende sessie moet de wachtkaart klaar zijn (betaalwijze + A-Kaart).
+  if(!isGratis && !klaarVoorSessie(w)){toon('&#9888;&#65039; '+watOntbreekt(w)); return;}
+  const toewijzing = doelId==='los' ? 'losse_klimsessie' : 'clubsessie';
+  const clubsessieId = doelId==='los' ? null : doel.dbId;  // echte clubsessie-UUID
 
-  // Bepaal per persoon het tegoed; bij ontbreken evt. lenen (async, met keuze).
-  const resultaten=[];
-  for(const p of personen){
-    let r=regelTegoed(p.persoonId, act, p.betaalwijze);
-    if(r.geenTegoed){
-      const persoon=ledenById[p.persoonId];
-      // Zijn er gezinsleden om van te lenen?
-      const heeftLeners = gezinId && Object.values(leden).some(x=>x.gezinId===gezinId && x.id!==p.persoonId && eersteBeurtkaart(x,act));
-      if(heeftLeners){
-        const keuze=await vraagLenen(persoon, act, gezinId);
-        if(keuze){ r={ok:true, bron:'geleend', afboeking:{kaart:keuze.kaart}, lenerNaam:keuze.lenerNaam, geleendVan:keuze.lenerNaam}; }
-        else { toon('&#9888;&#65039; '+persoon.voornaam+' heeft geen tegoed en er werd niet geleend.'); return; }
-      } else {
-        toon('&#9888;&#65039; '+persoon.voornaam+' heeft geen '+activiteitNaam(act)+'-tegoed. Kies "losse beurt".'); return;
-      }
+  // Verzamel iedereen die meedoet.
+  const personen=[];
+  if(w.hoofdMee!==false){ personen.push({persoonId:w.lidId, naam:w.naam, betaalwijze:w.betaalwijze, isHoofd:true, checkinId:w.dbCheckinId}); }
+  (w.gezinsleden||[]).filter(g=>g.aangevinkt).forEach(g=>{
+    const gl=(w.gezinsleden||[]).find(x=>x.lidId===g.lidId);
+    personen.push({persoonId:g.lidId, naam:g.naam, betaalwijze:g.betaalwijze, isHoofd:false, checkinId:null});
+  });
+  if(personen.length===0){toon('&#9888;&#65039; Kies minstens 1 persoon om in te checken');return;}
+
+  // Betaalwijze is enkel nodig bij een betalende activiteit.
+  if(!isGratis){
+    const zonderKeuze = personen.filter(p=>!p.betaalwijze);
+    if(zonderKeuze.length>0){
+      toon('&#9888;&#65039; Kies een betaalwijze voor: '+zonderKeuze.map(p=>p.naam.split(' ')[0]).join(', '));
+      return;
     }
-    resultaten.push({p, r});
   }
 
   const lijst=document.getElementById('lijst-'+doelId);
-  resultaten.forEach(({p,r})=>{
-    if(r.afboeking){ r.afboeking.kaart.beurten--; }
-    if(p.isHoofd){
-      w.sessie=doelId; w.sessieAct=act; w.sessieNaam=doel.naam; w.bronTekst=bronLabel(r); w.afboekingKaart=r.afboeking?r.afboeking.kaart:null;
-    } else {
-      const kid=++wachtId;
-      dagcheckins.push({id:kid,lidId:p.persoonId,naam:p.naam,sociaal:ledenById[p.persoonId].sociaal,
-        soort:'check_in',sessie:doelId,sessieAct:act,sessieNaam:doel.naam,geannuleerd:false,tijd:nu(),wie:medewerker(),
-        groepVan:w.id,gezinsleden:[],bronTekst:bronLabel(r),afboekingKaart:r.afboeking?r.afboeking.kaart:null});
+  const gelukteNamen=[];
+
+  // Per persoon: zorg voor een database-check-in en wijs toe.
+  for(const p of personen){
+    // 1. Bepaal of er geleend moet worden (alleen bij betalend + 'tegoed' zonder eigen tegoed).
+    let geleendVanKaartId = null;
+    if(!isGratis && p.betaalwijze==='tegoed'){
+      const eigen = tegoedStatus(w, p.persoonId, act);   // uit de cache
+      if(!eigen.abo && eigen.beurten<=0){
+        // Geen eigen tegoed voor deze activiteit: probeer te lenen binnen het gezin.
+        let leners=[];
+        try{ leners = await leenbareGezinsbeurten(p.persoonId, act); }catch(e){ leners=[]; }
+        if(Array.isArray(leners) && leners.length>0){
+          const keuze = await vraagLenenDb(p, act, leners);
+          if(keuze){ geleendVanKaartId = keuze.beurtenkaart_id; }
+          else { toon('&#9888;&#65039; '+p.naam.split(' ')[0]+' heeft geen tegoed en er werd niet geleend.'); return; }
+        } else {
+          toon('&#9888;&#65039; '+p.naam.split(' ')[0]+' heeft geen '+activiteitNaam(act)+'-tegoed. Kies "losse beurt".');
+          return;
+        }
+      }
     }
+
+    // 2. Zorg voor een database-check-in (gezinsleden hebben er nog geen).
+    let checkinId = p.checkinId;
+    if(!checkinId){
+      try{
+        const res = await dbCheckInLid(p.persoonId, HUIDIGE_MEDEWERKER_ID, 'check_in');
+        const cr = Array.isArray(res)?res[0]:res;
+        checkinId = cr?.checkin_id;
+      }catch(err){ console.error(err); toon('&#9888;&#65039; Kon '+p.naam.split(' ')[0]+' niet inchecken.'); return; }
+    }
+
+    // 3. Wijs toe (de database boekt de juiste beurt af, of niets bij abo/los).
+    try{
+      const uitkomst = await rondWachtkamerAf({
+        checkinId, toewijzing, clubsessieId, activiteit:act,
+        betaalwijze:p.betaalwijze, geleendVanKaartId, medewerkerId:HUIDIGE_MEDEWERKER_ID,
+      });
+      if(uitkomst!=='ok'){ toon('&#9888;&#65039; '+uitkomst); return; }
+    }catch(err){ console.error(err); toon('&#9888;&#65039; Toewijzen mislukte voor '+p.naam.split(' ')[0]); return; }
+
+    // 4. Toon in de sessielijst.
     const rij=document.createElement('div');rij.className='toegewezen';
-    rij.innerHTML='<span class="sym">&#9989;</span> '+p.naam+' <span style="font-size:12px;opacity:.7">('+bronLabel(r)+')</span>';
+    const bronTxt = p.betaalwijze==='los' ? 'losse beurt' : (geleendVanKaartId ? 'geleend' : 'tegoed');
+    rij.innerHTML='<span class="sym">&#9989;</span> '+p.naam+' <span style="font-size:12px;opacity:.7">('+bronTxt+')</span>';
     lijst.appendChild(rij);
-  });
-  // Deed de hoofdpersoon zelf niet mee? Dan de wachtkaart toch afsluiten.
-  if(w.hoofdMee===false){
-    w.sessie=doelId; w.sessieAct=act; w.sessieNaam=doel.naam; w.afboekingKaart=null; w.alleenKinderen=true;
-    delete wachtenden[w.id];
+    if(!p.isHoofd) gelukteNamen.push(p.naam.split(' ')[0]);
+
+    // dagoverzicht-registratie: werk de BESTAANDE regel bij (van bij het scannen),
+    // anders (meegekomen gezinslid zonder eigen dagregel) een nieuwe toevoegen.
+    const bestaand = dagcheckins.find(d=>d.dbCheckinId===checkinId && !d.geannuleerd);
+    if(bestaand){
+      bestaand.sessie=doelId; bestaand.sessieAct=act; bestaand.sessieNaam=doel.naam;
+    } else {
+      dagcheckins.push({id:++wachtId,lidId:p.persoonId,naam:p.naam,
+        soort:'check_in',sessie:doelId,sessieAct:act,sessieNaam:doel.naam,
+        geannuleerd:false,tijd:nu(),wie:medewerker(),dbCheckinId:checkinId});
+    }
   }
+
+  // De wachtkaart is afgehandeld: weg uit de wachtkamer.
+  delete wachtenden[w.id];
   tekenWachtkamer();tekenDag();
-  const meeNamen=resultaten.filter(x=>!x.p.isHoofd).map(x=>x.p.naam.split(' ')[0]);
-  const extra=meeNamen.length>0?' (met '+meeNamen.join(', ')+')':'';
+  const extra = gelukteNamen.length>0 ? ' (met '+gelukteNamen.join(', ')+')' : '';
   toon('&#9989; '+w.naam+extra+' &#8594; '+doel.naam);
 }
+
+// Leen-keuzevenster op basis van database-kandidaten (fn_leenbare_gezinsbeurten).
+// Zelfde tarieftype eerst (voorkeur, groen). Resolved met de gekozen kandidaat of null.
+let leenResolverDb=null;
+function vraagLenenDb(persoon, act, leners){
+  return new Promise(resolve=>{
+    leenResolverDb=resolve;
+    document.getElementById('leen-uitleg').innerHTML=persoon.naam.split(' ')[0]+' heeft geen '+activiteitNaam(act)+'-beurt meer. Van wie mag een beurt geleend worden?';
+    const box=document.getElementById('leen-opties');
+    box.innerHTML='';
+    leners.forEach(c=>{
+      // c = { lener_lid_id, voornaam, beurten, beurtenkaart_id, tarief }
+      const b=document.createElement('button');
+      b.className='leen-knop';
+      b.innerHTML='<b>'+c.voornaam+'</b> &#183; '+(c.tarief||'')+' &#183; nog '+c.beurten+' beurten';
+      b.onclick=()=>{ const r=leenResolverDb; leenResolverDb=null; document.getElementById('overlay-lenen').classList.remove('open'); r(c); };
+      box.appendChild(b);
+    });
+    document.getElementById('overlay-lenen').classList.add('open');
+  });
+}
+function leenAnnuleerDb(){ if(leenResolverDb){ const r=leenResolverDb; leenResolverDb=null; document.getElementById('overlay-lenen').classList.remove('open'); r(null); } }
 function tekenDag(){
   const t=document.getElementById('dagtabel');
   if(dagcheckins.length===0){t.innerHTML='<div class="leeg">Nog geen check-ins vandaag.</div>';return;}
@@ -704,22 +941,24 @@ function tekenDag(){
     t.appendChild(div);
   });
 }
-function herstelNaarWachtkamer(id){
+async function herstelNaarWachtkamer(id){
   const w=dagcheckins.find(x=>x.id===id);if(!w||!w.sessie)return;
-  // Beurt teruggeven als die was afgeboekt.
-  if(w.afboekingKaart){ w.afboekingKaart.beurten++; w.afboekingKaart=null; }
+  // De database geeft de juiste beurt terug (eigen of geleend) op basis van de check-in.
+  if(w.dbCheckinId){
+    try{
+      await dbHerstelNaarWachtkamer(w.dbCheckinId, HUIDIGE_MEDEWERKER_ID);
+    }catch(e){
+      console.error('Herstellen mislukte:', e);
+      toon('&#9888;&#65039; Kon niet terugzetten. Probeer opnieuw.');
+      return;
+    }
+  }
+  // Weergave bijwerken: uit de sessielijst halen.
   const lijst=document.getElementById('lijst-'+w.sessie);
   if(lijst)[...lijst.children].forEach(c=>{if(c.textContent.includes(w.naam))c.remove();});
-  // Hoofdpersoon komt terug in de wachtkamer; meegekomen gezinsleden worden los hersteld.
-  if(w.groepVan){
-    // Dit is een meegekomen gezinslid: gewoon uit de sessie halen (geen wachtkamer-terugkeer nodig).
-    w.sessie=null; w.geannuleerd=true;
-  } else {
-    w.sessie=null; w.sessieAct=null;
-    wachtenden[id]=w;
-  }
+  w.sessie=null; w.sessieAct=null; w.geannuleerd=true;
   tekenWachtkamer();tekenDag();
-  toon('&#8617;&#65039; '+w.naam+' terug in de wachtkamer'+(w.afboekingKaart===null?'':' &#8212; beurt teruggezet'));
+  toon('&#8617;&#65039; '+w.naam+' terug in de wachtkamer &#8212; beurt teruggezet indien van toepassing');
 }
 function zoek(){
   const q=document.getElementById('zoekinput').value.trim().toLowerCase();
@@ -762,23 +1001,53 @@ function maakNieuwProfiel(){
   checkInLid(l,'check_in');
   toon('&#9989; Profiel aangemaakt &#8212; staat in de wachtkamer');
 }
-function toonProfiel(lidId){
-  const l=ledenById[lidId]; if(!l) return;
-  const aboGeldig=l.abo&&new Date(l.abo)>=new Date();
-  const leeftijd=l.jaar?(new Date().getFullYear()-l.jaar)+' jaar':'&#8212;';
-  const lidmaatschap=aboGeldig?('Abonnement tot '+fmt(l.abo)):(l.beurten>0?(l.beurten+' beurten over'):'Geen beurten of abonnement');
+async function toonProfiel(lidId){
+  // Zoek de check-in (wachtkamer) waar deze persoon bij hoort, voor naam + tegoed.
+  let w=null, naam=lidId;
+  for(const x of Object.values(wachtenden)){
+    if(x.lidId===lidId){ w=x; naam=x.naam; break; }
+    const g=(x.gezinsleden||[]).find(gl=>gl.lidId===lidId);
+    if(g){ w=x; naam=g.naam; break; }
+  }
   const rij=(label,waarde)=>'<div class="profiel-rij"><span class="pl">'+label+'</span><span class="pv">'+waarde+'</span></div>';
+  // Tegoed per activiteit uit de cache van de check-in.
+  let tegoedTekst='&#8212;';
+  if(w && w.tegoed && w.tegoed[lidId]){
+    const delen=[];
+    ACTIVITEITEN.filter(act=>!act.gratis).forEach(act=>{
+      const t=w.tegoed[lidId][act.code];
+      if(!t) return;
+      if(t.abo) delen.push(act.naam+': abonnement'+(t.aboTot?' (geldig tot '+fmt(t.aboTot)+')':''));
+      else if(t.beurten>0) delen.push(act.naam+': '+t.beurten+' beurten');
+    });
+    tegoedTekst = delen.length>0 ? delen.join('<br>') : 'Geen actief tegoed';
+  }
+  // Toon het venster meteen met wat we al hebben; vul de rest aan uit de database.
   document.getElementById('profiel-inhoud').innerHTML=
-    rij('Naam', l.voornaam+' '+(l.achternaam||''))
-    + rij('Geboortejaar', (l.jaar||'&#8212;')+(l.jaar?' ('+leeftijd+')':''))
-    + rij('Postcode', l.postcode||'&#8212;')
-    + rij('Land van herkomst', l.herkomst||'&#8212;')
-    + rij('Sociaal tarief', l.sociaal?'Ja &#8212; A-Kaart nodig':'Nee')
-    + rij('Lidmaatschap', lidmaatschap);
+    rij('Naam', naam)
+    + rij('Leeftijd', '&#8230;')
+    + rij('Postcode (woonplaats)', '&#8230;')
+    + rij('Land van herkomst', '&#8230;')
+    + rij('Sociaal tarief', (w&&w.sociaal)?'Ja &#8212; A-Kaart nodig':'Nee')
+    + rij('Tegoed', tegoedTekst);
   document.getElementById('overlay-profiel').classList.add('open');
+  // Haal de profielgegevens op (geboortejaar, postcode, herkomst).
+  try{
+    const p = await dbHaalLid(lidId);
+    if(p){
+      const leeftijd = p.geboortejaar ? (new Date().getFullYear()-p.geboortejaar)+' jaar (' + p.geboortejaar + ')' : '&#8212;';
+      const volNaam = (p.voornaam||'') + ' ' + (p.achternaam||'');
+      document.getElementById('profiel-inhoud').innerHTML=
+        rij('Naam', volNaam.trim()||naam)
+        + rij('Leeftijd', leeftijd)
+        + rij('Postcode (woonplaats)', p.postcode||'&#8212;')
+        + rij('Land van herkomst', p.herkomst||'&#8212;')
+        + rij('Sociaal tarief', p.sociaal_tarief?'Ja &#8212; A-Kaart nodig':'Nee')
+        + rij('Tegoed', tegoedTekst);
+    }
+  }catch(e){ console.error('Kon profielgegevens niet laden:', e); }
 }
 function sluitProfiel(){document.getElementById('overlay-profiel').classList.remove('open');}
-function medewerker(){return document.getElementById('medewerker').value;}
 function nu(){return new Date().toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'});}
 function fmt(d){return new Date(d).toLocaleDateString('nl-BE',{day:'numeric',month:'short',year:'numeric'});}
 let toastTimer;
@@ -786,12 +1055,15 @@ function toon(t){const el=document.getElementById('toast');el.innerHTML=t;el.cla
 // ===========================================================================
 // ADMIN-MODUS (zie ledenbeheer voor uitleg; identiek gedrag)
 // ===========================================================================
-const ADMIN_RECHTEN={ 'Lana (admin)': true };
 const DEMO_WACHTWOORD='rising';
 const ADMIN_TIMEOUT=10*60*1000;
 let adminModusActief=false, adminTimer=null;
 try{ if(sessionStorage.getItem('ry_admin')==='1') adminModusActief=true; }catch(e){}
-function medewerkerMagAdmin(){ return ADMIN_RECHTEN[medewerker()]===true; }
+// Mag de huidige medewerker admin worden? Gebaseerd op is_admin uit de database.
+function medewerkerMagAdmin(){
+  const m=MEDEWERKERS.find(x=>x.id===HUIDIGE_MEDEWERKER_ID);
+  return !!(m && m.is_admin);
+}
 function isAdmin(){ return adminModusActief && medewerkerMagAdmin(); }
 function adminKnopActie(){
   if(adminModusActief){ adminAfmelden(); return; }
@@ -831,22 +1103,55 @@ function startAdminTimer(){
 }
 ['click','keydown','mousemove'].forEach(ev=>document.addEventListener(ev,()=>{ if(adminModusActief)startAdminTimer(); }));
 function medewerkerGewijzigd(){
+  // De gekozen medewerker vastleggen (id in de option-value) en bewaren.
+  const sel=document.getElementById('medewerker');
+  HUIDIGE_MEDEWERKER_ID = sel.value;
+  bewaarGekozenMedewerker(HUIDIGE_MEDEWERKER_ID);
   if(adminModusActief){ adminModusActief=false; if(adminTimer)clearTimeout(adminTimer); }
   werkAdminKnopBij();
 }
+
+// Vul de dropdown met actieve medewerkers uit de database en herstel de keuze.
+async function laadMedewerkers(){
+  try{
+    MEDEWERKERS = await dbActieveMedewerkers() || [];
+  }catch(e){ console.error('Medewerkers laden mislukte:',e); MEDEWERKERS=[]; }
+  const sel=document.getElementById('medewerker');
+  if(!sel) return;
+  sel.innerHTML = MEDEWERKERS.map(m=>
+    '<option value="'+m.id+'">'+m.voornaam+(m.is_admin?' (admin)':'')+'</option>'
+  ).join('');
+  // Herstel de eerder gekozen medewerker, of neem de eerste.
+  const bewaard = leesGekozenMedewerker();
+  if(bewaard && MEDEWERKERS.some(m=>m.id===bewaard)){
+    sel.value = bewaard; HUIDIGE_MEDEWERKER_ID = bewaard;
+  } else if(MEDEWERKERS.length>0){
+    sel.value = MEDEWERKERS[0].id; HUIDIGE_MEDEWERKER_ID = MEDEWERKERS[0].id;
+    bewaarGekozenMedewerker(HUIDIGE_MEDEWERKER_ID);
+  }
+}
+// Naam van de huidige medewerker (voor het dagoverzicht).
+function medewerker(){
+  const m=MEDEWERKERS.find(x=>x.id===HUIDIGE_MEDEWERKER_ID);
+  return m ? m.voornaam : '';
+}
 werkAdminKnopBij();
-tekenSessies();
+await laadMedewerkers();          // vul de kassa-kiezer en herstel de keuze
+await laadActiviteitenLijst();   // activiteiten uit de database (incl. nieuwe/gratis)
+laadSessies();   // haalt de echte clubsessies van vandaag op en tekent ze
 document.getElementById('scaninput').focus();
 function tekenSessies(){
   const box=document.getElementById('sessies');
   box.innerHTML='';
+  // Hulpfunctie: maak een sessievak aanklikbaar om de gepakte kaart te plaatsen.
+  const koppelKlik=(vak, doelId)=>{
+    vak.addEventListener('click', ()=>{ kiesSessie(doelId); });
+  };
   // Losse klimsessie (altijd klimmen)
   const vakLos=document.createElement('div');
   vakLos.className='sessie los'; vakLos.id='sessie-los';
-  vakLos.setAttribute('ondragover','dragOver(event,this)');
-  vakLos.setAttribute('ondragleave','dragLeave(this)');
-  vakLos.setAttribute('ondrop','drop(event,\'los\')');
   vakLos.innerHTML='<h3><span class="sym">&#129695;</span> Losse klimsessie</h3><div class="act-tag">Klimmen</div><div id="lijst-los"></div>';
+  koppelKlik(vakLos, 'los');
   box.appendChild(vakLos);
   // Clubsessies van vandaag (op weekdag)
   const vandaag=sessiesVandaag();
@@ -859,13 +1164,35 @@ function tekenSessies(){
   vandaag.forEach(c=>{
     const vak=document.createElement('div');
     vak.className='sessie club'; vak.id='sessie-'+c.id;
-    vak.setAttribute('ondragover','dragOver(event,this)');
-    vak.setAttribute('ondragleave','dragLeave(this)');
-    vak.setAttribute('ondrop','drop(event,\''+c.id+'\')');
     vak.innerHTML='<h3><span class="sym">&#128101;</span> '+c.naam+'</h3><div class="act-tag">'+activiteitNaam(c.activiteit)+'</div><div id="lijst-'+c.id+'"></div>';
+    koppelKlik(vak, c.id);
     box.appendChild(vak);
   });
+  markeerSessies();  // herstel de 'kies'-markering als er een kaart gepakt is
 }
+
+// ===========================================================================
+// MODULE-KOPPELING
+// Omdat dit script een module is, zijn functies niet automatisch globaal.
+// We koppelen de functies die vanuit HTML (onclick, ondrop, ...) worden
+// aangeroepen expliciet aan window, zodat de knoppen werken.
+// ===========================================================================
+Object.assign(window, {
+  // wachtkamer
+  zetHoofdBetaalwijze, zetBetaalwijze, vinkGezinslid, vinkHoofd, vinkAkaart,
+  annuleer, toonProfiel, herstelNaarWachtkamer, leenAnnuleerDb,
+  // toewijzen (aantik-methode)
+  pakKaart, kiesSessie,
+  // scannen
+  verwerkScan,
+  // profiel / landen
+  openNieuwProfiel, sluitNieuw, maakNieuwProfiel, openLandKiezer, sluitLandKiezer,
+  tekenLanden, sluitProfiel,
+  // medewerker / admin
+  medewerkerGewijzigd, adminKnopActie, doeAdminLogin, sluitAdminLogin,
+  // zoeken
+  zoek,
+});
 </script>
 </body>
 </html>

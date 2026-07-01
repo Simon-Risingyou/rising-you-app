@@ -87,6 +87,11 @@
   .modal h3{font-size:20px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--tekst);color:#fff;padding:13px 20px;border-radius:12px;font-size:15px;display:none;align-items:center;gap:10px;z-index:80;max-width:90vw}
   .toast.open{display:flex}
+  .toggle{display:flex;align-items:center;gap:8px;font-size:15px;cursor:pointer;user-select:none}
+  .switch{position:relative;width:42px;height:24px;background:var(--lijn);border-radius:12px;transition:.2s;flex-shrink:0;display:inline-block}
+  .switch.aan{background:var(--geel)}
+  .switch::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s}
+  .switch.aan::after{transform:translateX(18px)}
 </style>
 </head>
 <body>
@@ -107,6 +112,8 @@
     <button class="subtab actief" id="st-sessies" onclick="toonPaneel('sessies')"><span class="sym">&#128197;</span> Sessies inplannen</button>
     <button class="subtab" id="st-wijzigingen" onclick="toonPaneel('wijzigingen')"><span class="sym">&#9851;&#65039;</span> Recente wijzigingen</button>
     <button class="subtab" id="st-accounts" onclick="toonPaneel('accounts')"><span class="sym">&#10133;</span> Nieuwe accounts <span id="acc-teller" style="background:var(--rood);color:#fff;border-radius:999px;padding:1px 8px;font-size:12px;margin-left:4px"></span></button>
+    <button class="subtab" id="st-activiteiten" onclick="toonPaneel('activiteiten')"><span class="sym">&#127919;</span> Activiteiten</button>
+    <button class="subtab" id="st-medewerkers" onclick="toonPaneel('medewerkers')"><span class="sym">&#128101;</span> Medewerkers</button>
     <button class="subtab" disabled style="opacity:.5;cursor:not-allowed"><span class="sym">&#128202;</span> Statistieken (later)</button>
   </div>
 
@@ -138,6 +145,43 @@
       <h2><span class="sym">&#10133;</span> Nieuwe accounts &#8212; goedkeuren</h2>
       <p style="font-size:14px;color:var(--grijs);margin-bottom:14px">Nieuwe profielen wachten op goedkeuring. Keur goed, wijs af, of bewerk eerst.</p>
       <div id="acc-lijst"></div>
+    </div>
+  </div>
+
+  <!-- PANEEL: ACTIVITEITEN -->
+  <div class="paneel" id="paneel-activiteiten">
+    <div class="kaart">
+      <h2><span class="sym">&#127919;</span> Activiteiten beheren</h2>
+      <p style="font-size:14px;color:var(--grijs);margin-bottom:14px">Activiteiten bepalen waar leden tegoed voor hebben en aan welke sessies ze kunnen deelnemen. <b>Gratis</b> activiteiten (bv. een conversatietafel) hebben geen beurten of abonnement nodig &#8212; ze worden enkel geregistreerd.</p>
+      <div id="act-lijst"></div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--lijn)">
+        <div class="veld-rij" style="align-items:flex-end">
+          <div class="veld"><label>Nieuwe activiteit (naam)</label><input id="na-naam" placeholder="bv. Conversatietafel"></div>
+          <div class="veld" style="flex:0 0 auto"><label style="visibility:hidden">.</label>
+            <label class="toggle" style="white-space:nowrap"><span class="switch" id="na-gratis-switch" onclick="this.classList.toggle('aan')"></span> Gratis</label></div>
+          <div class="veld" style="flex:0 0 auto"><label style="visibility:hidden">.</label>
+            <button class="knop knop-paars" onclick="maakActiviteitDb()"><span class="sym">&#10133;</span> Toevoegen</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PANEEL: MEDEWERKERS -->
+  <div class="paneel" id="paneel-medewerkers">
+    <div class="kaart">
+      <h2><span class="sym">&#128101;</span> Medewerkers beheren</h2>
+      <p style="font-size:14px;color:var(--grijs);margin-bottom:14px">Voeg medewerkers toe of verwijder ze, beheer wie <b>admin</b> is, en stel een persoonlijk wachtwoord in voor admins (nodig om in dit portaal te komen).</p>
+      <div id="mdw-lijst"></div>
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--lijn)">
+        <div class="veld-rij" style="align-items:flex-end">
+          <div class="veld"><label>Voornaam</label><input id="nm-voornaam" placeholder="bv. Fatima"></div>
+          <div class="veld"><label>Achternaam</label><input id="nm-achternaam" placeholder="(optioneel)"></div>
+          <div class="veld" style="flex:0 0 auto"><label style="visibility:hidden">.</label>
+            <label class="toggle" style="white-space:nowrap"><span class="switch" id="nm-admin-switch" onclick="this.classList.toggle('aan')"></span> Admin</label></div>
+          <div class="veld" style="flex:0 0 auto"><label style="visibility:hidden">.</label>
+            <button class="knop knop-paars" onclick="maakMedewerkerDb()"><span class="sym">&#10133;</span> Toevoegen</button></div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -176,55 +220,129 @@
   </div>
 </div>
 
+<div class="overlay" id="overlay-ww">
+  <div class="modal" style="max-width:400px">
+    <h3><span class="sym">&#128273;</span> Wachtwoord instellen</h3>
+    <p style="font-size:14px;color:var(--grijs);margin:8px 0 14px">Nieuw wachtwoord voor <b id="ww-naam"></b> om in het admin portaal te komen.</p>
+    <input id="ww-invoer" type="password" placeholder="Nieuw wachtwoord (min. 4 tekens)" style="width:100%;padding:10px;border:2px solid var(--lijn);border-radius:10px;font-size:16px">
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button class="knop knop-grijs" style="flex:1" onclick="sluitWachtwoord()">Annuleer</button>
+      <button class="knop knop-blauw" style="flex:1" onclick="bewaarWachtwoord()"><span class="sym">&#10003;</span> Bewaren</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-act-bewerk">
+  <div class="modal" style="max-width:420px">
+    <h3><span class="sym">&#9999;&#65039;</span> Activiteit bewerken</h3>
+    <div class="veld" style="margin-top:10px"><label>Naam</label><input id="ab-naam"></div>
+    <label class="toggle" style="margin-top:12px"><span class="switch" id="ab-gratis-switch" onclick="this.classList.toggle('aan')"></span> Gratis activiteit (geen beurten of abonnement)</label>
+    <div style="display:flex;gap:10px;margin-top:18px">
+      <button class="knop knop-grijs" style="flex:1" onclick="sluitActBewerk()">Annuleer</button>
+      <button class="knop knop-blauw" style="flex:1" onclick="bewaarActBewerk()"><span class="sym">&#10003;</span> Bewaren</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-bevestig">
+  <div class="modal" style="max-width:420px">
+    <h3 id="bevestig-titel"><span class="sym">&#10067;</span> Bevestigen</h3>
+    <p id="bevestig-tekst" style="font-size:15px;color:var(--grijs);margin:10px 0 18px;line-height:1.5"></p>
+    <div style="display:flex;gap:10px">
+      <button class="knop knop-grijs" style="flex:1" onclick="bevestigNee()">Annuleer</button>
+      <button class="knop knop-blauw" style="flex:1" id="bevestig-ja-knop" onclick="bevestigJa()">Ja</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
-<script>
+<script type="module">
+import { alleClubsessies as dbAlleClubsessies, maakClubsessie as dbMaakClubsessie,
+         wijzigClubsessie as dbWijzigClubsessie, verwijderClubsessie as dbVerwijderClubsessie,
+         voegMomentToe as dbVoegMomentToe, verwijderMoment as dbVerwijderMoment,
+         recenteWijzigingen as dbRecenteWijzigingen,
+         keurAccountGoed as dbKeurAccountGoed, wijsAccountAf as dbWijsAccountAf,
+         alleActiviteiten as dbAlleActiviteiten, maakActiviteit as dbMaakActiviteit,
+         wijzigActiviteit as dbWijzigActiviteit, deactiveerActiviteit as dbDeactiveerActiviteit,
+         nieuweAccounts as dbNieuweAccounts,
+         alleMedewerkers as dbAlleMedewerkers, maakMedewerker as dbMaakMedewerker,
+         deactiveerMedewerker as dbDeactiveerMedewerker, zetAdminRechten as dbZetAdminRechten,
+         zetAdminWachtwoord as dbZetAdminWachtwoord } from './src/lib/databron.js';
+
+// Tijdelijk: vaste medewerker (Lana, admin uit de testdata).
+const HUIDIGE_MEDEWERKER_ID = '00000000-0000-0000-0000-0000000000b1';
+
 // Toegangscontrole: het admin portaal is enkel voor ingelogde admins.
-// Wie hier zonder admin-status belandt, wordt teruggestuurd naar de check-in.
 (function(){
   let ingelogd=false;
   try{ ingelogd = sessionStorage.getItem('ry_admin')==='1'; }catch(e){}
   if(!ingelogd){ window.location.href='index.html'; }
 })();
-const ACTIVITEITEN=[{code:"klimmen",naam:"Klimmen"},{code:"yoga",naam:"Yoga"},{code:"workout",naam:"We Workout"}];
+// Activiteiten worden uit de database geladen (fn_alle_activiteiten) zodat
+// nieuwe activiteiten (bv. een conversatietafel) overal verschijnen.
+let ACTIVITEITEN=[];
+async function laadActiviteitenLijst(){
+  try{
+    const lijst = await dbAlleActiviteiten() || [];
+    ACTIVITEITEN = lijst.map(a=>({code:a.code, naam:a.naam, gratis:a.gratis}));
+  }catch(e){ console.error('Activiteiten laden mislukte:',e); ACTIVITEITEN=[]; }
+}
 const DAGEN=["zondag","maandag","dinsdag","woensdag","donderdag","vrijdag","zaterdag"];
 
-// --- Voorbeelddata ---
-let sessies=[
-  {id:"s1", naam:"Klimclub", activiteit:"klimmen", momenten:[
-    {dag:2, start:"18:00", eind:"21:00"}, {dag:4, start:"18:00", eind:"21:00"}]},
-  {id:"s2", naam:"Yoga", activiteit:"yoga", momenten:[
-    {dag:2, start:"19:00", eind:"20:00"}, {dag:0, start:"10:00", eind:"11:00"}]},
-  {id:"s3", naam:"We Workout", activiteit:"workout", momenten:[
-    {dag:1, start:"17:30", eind:"18:30"}, {dag:5, start:"17:30", eind:"18:30"}]},
-];
+// Sessies worden uit de database geladen (fn_alle_clubsessies). Elk moment heeft
+// een database-id, zodat we het gericht kunnen verwijderen.
+let sessies=[];
 
-// Recente wijzigingen (zou uit handelingen_log komen)
-let wijzigingen=[
-  {tijd:"09:12", lid:"Guy Janssens", medewerker:"Sara", type:"postcode", tekst:"Postcode gewijzigd naar 2018"},
-  {tijd:"09:14", lid:"Guy Janssens", medewerker:"Sara", type:"beurten", tekst:"10 klimbeurten bijgekocht"},
-  {tijd:"09:40", lid:"Anna Petrova", medewerker:"Mehmet", type:"abonnement", tekst:"Abonnement klimmen 6 maanden toegevoegd"},
-  {tijd:"10:05", lid:"Omar Haddad", medewerker:"Sara", type:"foto", tekst:"Profielfoto toegevoegd"},
-  {tijd:"10:22", lid:"Guy Janssens", medewerker:"Joke", type:"tarieftype", tekst:"Tarieftype op volwassene gezet"},
-  {tijd:"11:01", lid:"Lin Chen", medewerker:"Mehmet", type:"beurten", tekst:"5 yogabeurten bijgekocht"},
-];
+// Haal alle clubsessies op uit de database en zet om naar het frontend-formaat.
+async function laadSessies(){
+  try{
+    const data = await dbAlleClubsessies();
+    const arr = Array.isArray(data)?data:[];
+    sessies = arr.map(s=>({
+      id: s.id, naam: s.naam, activiteit: s.activiteit,
+      momenten: (s.momenten||[]).map(m=>({
+        id: m.id, dag: m.weekdag, start: m.start_tijd, eind: m.eind_tijd,
+      })),
+    }));
+  }catch(e){ console.error('Sessies laden mislukte:',e); sessies=[]; }
+  tekenSessies();
+}
 
-// Nieuwe accounts (zouden status 'nieuw' hebben)
-let nieuweAccounts=[
-  {id:"n1", voornaam:"Yusuf", achternaam:"Demir", jaar:1998, postcode:"2060", herkomst:"Turkije", bron:"zelfregistratie", tijd:"vandaag 08:30"},
-  {id:"n2", voornaam:"Maria", achternaam:"Santos", jaar:2010, postcode:"2140", herkomst:"Portugal", bron:"kassa", tijd:"vandaag 09:50"},
-];
+// Nieuwe accounts worden uit de database geladen (fn_nieuwe_accounts).
+let nieuweAccounts=[];
 
 let sessieBewerkId=null, accBewerkId=null, groepModus='lid';
 
 function toon(t){const el=document.getElementById('toast');el.innerHTML=t;el.classList.add('open');clearTimeout(el._t);el._t=setTimeout(()=>el.classList.remove('open'),2600);}
 function activiteitNaam(c){const a=ACTIVITEITEN.find(x=>x.code===c);return a?a.naam:c;}
 
+// Nette bevestigingspopup in de stijl van de app. Geeft een Promise<boolean>.
+let _bevestigResolve=null;
+function vraagBevestiging(tekst, jaLabel){
+  document.getElementById('bevestig-tekst').innerHTML=tekst;
+  document.getElementById('bevestig-ja-knop').textContent=jaLabel||'Ja';
+  document.getElementById('overlay-bevestig').classList.add('open');
+  return new Promise(resolve=>{ _bevestigResolve=resolve; });
+}
+function bevestigJa(){
+  document.getElementById('overlay-bevestig').classList.remove('open');
+  if(_bevestigResolve){ _bevestigResolve(true); _bevestigResolve=null; }
+}
+function bevestigNee(){
+  document.getElementById('overlay-bevestig').classList.remove('open');
+  if(_bevestigResolve){ _bevestigResolve(false); _bevestigResolve=null; }
+}
+
 function toonPaneel(naam){
-  ['sessies','wijzigingen','accounts'].forEach(p=>{
+  ['sessies','wijzigingen','accounts','activiteiten','medewerkers'].forEach(p=>{
     document.getElementById('paneel-'+p).classList.toggle('actief',p===naam);
     document.getElementById('st-'+p).classList.toggle('actief',p===naam);
   });
+  if(naam==='activiteiten') laadActiviteiten();
+  if(naam==='wijzigingen') laadWijzigingen();
+  if(naam==='accounts') laadAccounts();
+  if(naam==='medewerkers') laadMedewerkersBeheer();
 }
 
 // ============ SESSIES ============
@@ -239,7 +357,7 @@ function tekenSessies(){
       momentenHtml+='<div class="moment-rij">'
         +'<span class="moment-dag">'+DAGEN[m.dag].charAt(0).toUpperCase()+DAGEN[m.dag].slice(1)+'</span>'
         +'<span class="moment-tijd">'+m.start+(m.eind?' &#8211; '+m.eind:'')+'</span>'
-        +'<button class="mini-knop rood" onclick="verwijderMoment(\''+s.id+'\','+mi+')">&#10005;</button></div>';
+        +'<button class="mini-knop rood" onclick="verwijderMoment(\''+s.id+'\',\''+m.id+'\')">&#10005;</button></div>';
     });
     if(s.momenten.length===0) momentenHtml='<div style="font-size:14px;color:var(--grijs);padding:6px 0">Nog geen momenten.</div>';
     div.innerHTML=
@@ -256,21 +374,24 @@ function tekenSessies(){
     box.appendChild(div);
   });
 }
-function voegMomentToe(sid){
+async function voegMomentToe(sid){
   const s=sessies.find(x=>x.id===sid);if(!s)return;
   const dag=parseInt(document.getElementById('nm-dag-'+sid).value);
   const start=document.getElementById('nm-start-'+sid).value;
   const eind=document.getElementById('nm-eind-'+sid).value;
   if(!start){toon('&#9888;&#65039; Kies een starttijd');return;}
-  s.momenten.push({dag,start,eind});
-  s.momenten.sort((a,b)=>a.dag-b.dag||a.start.localeCompare(b.start));
-  tekenSessies();
-  toon('&#9989; Moment toegevoegd aan '+s.naam);
+  try{
+    await dbVoegMomentToe(sid, dag, start, eind||null, HUIDIGE_MEDEWERKER_ID);
+    toon('&#9989; Moment toegevoegd aan '+s.naam);
+    await laadSessies();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Toevoegen mislukte.'); }
 }
-function verwijderMoment(sid,mi){
-  const s=sessies.find(x=>x.id===sid);if(!s)return;
-  s.momenten.splice(mi,1);tekenSessies();
-  toon('&#10005; Moment verwijderd');
+async function verwijderMoment(sid,momentId){
+  try{
+    await dbVerwijderMoment(momentId, HUIDIGE_MEDEWERKER_ID);
+    toon('&#10005; Moment verwijderd');
+    await laadSessies();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Verwijderen mislukte.'); }
 }
 function openNieuweSessie(){
   sessieBewerkId=null;
@@ -290,27 +411,217 @@ function bewerkSessie(sid){
   document.getElementById('overlay-sessie').classList.add('open');
 }
 function sluitSessieModal(){document.getElementById('overlay-sessie').classList.remove('open');}
-function bewaarSessie(){
+async function bewaarSessie(){
   const naam=document.getElementById('ms-naam').value.trim();
   const act=document.getElementById('ms-activiteit').value;
   if(!naam){toon('&#9888;&#65039; Geef een naam');return;}
-  if(sessieBewerkId){
-    const s=sessies.find(x=>x.id===sessieBewerkId);s.naam=naam;s.activiteit=act;
-    toon('&#9989; Sessie aangepast');
-  } else {
-    sessies.push({id:'s'+Date.now(),naam,activiteit:act,momenten:[]});
-    toon('&#9989; Sessie "'+naam+'" aangemaakt');
-  }
-  sluitSessieModal();tekenSessies();
+  try{
+    if(sessieBewerkId){
+      await dbWijzigClubsessie(sessieBewerkId, naam, act, HUIDIGE_MEDEWERKER_ID);
+      toon('&#9989; Sessie aangepast');
+    } else {
+      await dbMaakClubsessie(naam, act, HUIDIGE_MEDEWERKER_ID);
+      toon('&#9989; Sessie "'+naam+'" aangemaakt');
+    }
+    sluitSessieModal();
+    await laadSessies();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Bewaren mislukte.'); }
 }
-function verwijderSessie(sid){
+async function verwijderSessie(sid){
   const s=sessies.find(x=>x.id===sid);if(!s)return;
-  if(!confirm('Sessie "'+s.naam+'" en al haar momenten verwijderen?'))return;
-  sessies=sessies.filter(x=>x.id!==sid);tekenSessies();
-  toon('&#128465;&#65039; Sessie verwijderd');
+  const ok=await vraagBevestiging('Sessie "<b>'+s.naam+'</b>" en al haar momenten verwijderen?','Ja, verwijderen');
+  if(!ok)return;
+  try{
+    await dbVerwijderClubsessie(sid, HUIDIGE_MEDEWERKER_ID);
+    toon('&#128465;&#65039; Sessie verwijderd');
+    await laadSessies();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Verwijderen mislukte.'); }
+}
+
+// ============ ACTIVITEITEN ============
+let activiteitenLijst=[];
+async function laadActiviteiten(){
+  const box=document.getElementById('act-lijst');
+  box.innerHTML='<div class="leeg">Laden\u2026</div>';
+  try{
+    activiteitenLijst = await dbAlleActiviteiten() || [];
+  }catch(e){ console.error(e); box.innerHTML='<div class="leeg">Laden mislukt.</div>'; return; }
+  if(activiteitenLijst.length===0){ box.innerHTML='<div class="leeg">Nog geen activiteiten.</div>'; return; }
+  box.innerHTML='';
+  activiteitenLijst.forEach(a=>{
+    const div=document.createElement('div');
+    div.style.cssText='display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--lijn);border-radius:10px;margin-bottom:8px';
+    div.innerHTML=
+      '<div style="flex:1"><b>'+a.naam+'</b>'
+      + (a.gratis?' <span style="font-size:12px;color:var(--groen);font-weight:600">&#183; gratis</span>':' <span style="font-size:12px;color:var(--grijs)">&#183; betalend</span>')
+      + '</div>'
+      +'<button class="mini-knop blauw" onclick="bewerkActiviteit(\''+a.code+'\')">&#9999;&#65039; Bewerk</button>'
+      +'<button class="mini-knop rood" onclick="deactiveerActiviteitDb(\''+a.code+'\',\''+a.naam.replace(/'/g,"\\'")+'\')">&#128465;&#65039;</button>';
+    box.appendChild(div);
+  });
+}
+async function maakActiviteitDb(){
+  const naam=document.getElementById('na-naam').value.trim();
+  const gratis=document.getElementById('na-gratis-switch').classList.contains('aan');
+  if(!naam){ toon('&#9888;&#65039; Geef een naam'); return; }
+  try{
+    const r=await dbMaakActiviteit(naam, gratis, HUIDIGE_MEDEWERKER_ID);
+    if(r && r!=='ok'){ toon('&#9888;&#65039; '+r); return; }
+    toon('&#9989; Activiteit "'+naam+'" toegevoegd');
+    document.getElementById('na-naam').value='';
+    document.getElementById('na-gratis-switch').classList.remove('aan');
+    await laadActiviteitenLijst();   // ververs de gedeelde lijst (voor sessie-modal)
+    await laadActiviteiten();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Toevoegen mislukte.'); }
+}
+let actBewerkCode=null;
+function bewerkActiviteit(code){
+  const a=activiteitenLijst.find(x=>x.code===code);if(!a)return;
+  actBewerkCode=code;
+  document.getElementById('ab-naam').value=a.naam;
+  document.getElementById('ab-gratis-switch').classList.toggle('aan', !!a.gratis);
+  document.getElementById('overlay-act-bewerk').classList.add('open');
+}
+function sluitActBewerk(){ document.getElementById('overlay-act-bewerk').classList.remove('open'); actBewerkCode=null; }
+async function bewaarActBewerk(){
+  if(!actBewerkCode) return;
+  const naam=document.getElementById('ab-naam').value.trim();
+  const gratis=document.getElementById('ab-gratis-switch').classList.contains('aan');
+  if(!naam){ toon('&#9888;&#65039; Geef een naam'); return; }
+  try{
+    await dbWijzigActiviteit(actBewerkCode, naam, gratis, HUIDIGE_MEDEWERKER_ID);
+    toon('&#9989; Activiteit aangepast');
+    sluitActBewerk();
+    await laadActiviteitenLijst();
+    await laadActiviteiten();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Wijzigen mislukte.'); }
+}
+async function deactiveerActiviteitDb(code, naam){
+  const ok=await vraagBevestiging('Activiteit "<b>'+naam+'</b>" verwijderen uit de keuzelijsten?<br><br>Bestaande gegevens blijven bewaard.','Ja, verwijderen');
+  if(!ok)return;
+  try{
+    await dbDeactiveerActiviteit(code, HUIDIGE_MEDEWERKER_ID);
+    toon('&#128465;&#65039; Activiteit verwijderd');
+    await laadActiviteitenLijst();
+    await laadActiviteiten();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Verwijderen mislukte.'); }
+}
+
+// ============ MEDEWERKERS ============
+let medewerkersLijst=[];
+async function laadMedewerkersBeheer(){
+  const box=document.getElementById('mdw-lijst');
+  box.innerHTML='<div class="leeg">Laden\u2026</div>';
+  try{
+    medewerkersLijst = await dbAlleMedewerkers() || [];
+  }catch(e){ console.error(e); box.innerHTML='<div class="leeg">Laden mislukt.</div>'; return; }
+  box.innerHTML='';
+  medewerkersLijst.forEach(m=>{
+    const div=document.createElement('div');
+    div.style.cssText='display:flex;align-items:center;gap:10px;padding:10px;border:1px solid var(--lijn);border-radius:10px;margin-bottom:8px'+(m.actief?'':';opacity:.5');
+    let rechten='';
+    if(m.is_admin){
+      rechten='<span style="font-size:12px;color:var(--paars);font-weight:600">&#128273; admin</span>';
+      rechten+=m.heeft_wachtwoord?' <span style="font-size:12px;color:var(--groen)">&#183; wachtwoord ingesteld</span>':' <span style="font-size:12px;color:var(--rood)">&#183; geen wachtwoord!</span>';
+    } else {
+      rechten='<span style="font-size:12px;color:var(--grijs)">medewerker</span>';
+    }
+    let knoppen='';
+    if(m.actief){
+      knoppen+='<button class="mini-knop '+(m.is_admin?'grijs':'paars')+'" onclick="toggleAdminDb(\''+m.id+'\','+(m.is_admin?'false':'true')+')">'+(m.is_admin?'Admin uit':'Maak admin')+'</button>';
+      if(m.is_admin) knoppen+='<button class="mini-knop blauw" onclick="openWachtwoord(\''+m.id+'\',\''+m.voornaam.replace(/'/g,"\\'")+'\')">&#128273; Wachtwoord</button>';
+      knoppen+='<button class="mini-knop rood" onclick="deactiveerMedewerkerDb(\''+m.id+'\',\''+m.voornaam.replace(/'/g,"\\'")+'\')">&#128465;&#65039;</button>';
+    } else {
+      knoppen='<span style="font-size:12px;color:var(--grijs)">inactief</span>';
+    }
+    div.innerHTML='<div style="flex:1"><b>'+m.voornaam+' '+(m.achternaam||'')+'</b><div>'+rechten+'</div></div>'+knoppen;
+    box.appendChild(div);
+  });
+}
+async function maakMedewerkerDb(){
+  const voornaam=document.getElementById('nm-voornaam').value.trim();
+  const achternaam=document.getElementById('nm-achternaam').value.trim();
+  const isAdmin=document.getElementById('nm-admin-switch').classList.contains('aan');
+  if(!voornaam){ toon('&#9888;&#65039; Geef een voornaam'); return; }
+  try{
+    await dbMaakMedewerker(voornaam, achternaam, isAdmin, HUIDIGE_MEDEWERKER_ID);
+    toon('&#9989; Medewerker "'+voornaam+'" toegevoegd'+(isAdmin?' \u2014 stel nog een wachtwoord in':''));
+    document.getElementById('nm-voornaam').value='';
+    document.getElementById('nm-achternaam').value='';
+    document.getElementById('nm-admin-switch').classList.remove('aan');
+    await laadMedewerkersBeheer();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Toevoegen mislukte.'); }
+}
+async function toggleAdminDb(id, nieuw){
+  try{
+    const r=await dbZetAdminRechten(id, nieuw, HUIDIGE_MEDEWERKER_ID);
+    if(r && r!=='ok'){ toon('&#9888;&#65039; '+r); return; }
+    toon('&#9989; Admin-rechten '+(nieuw?'aangezet':'uitgezet'));
+    await laadMedewerkersBeheer();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Wijzigen mislukte.'); }
+}
+async function deactiveerMedewerkerDb(id, naam){
+  const ok=await vraagBevestiging('Medewerker "<b>'+naam+'</b>" verwijderen?<br><br>De geschiedenis in de logs blijft bewaard.','Ja, verwijderen');
+  if(!ok)return;
+  try{
+    const r=await dbDeactiveerMedewerker(id, HUIDIGE_MEDEWERKER_ID);
+    if(r && r!=='ok'){ toon('&#9888;&#65039; '+r); return; }
+    toon('&#128465;&#65039; Medewerker verwijderd');
+    await laadMedewerkersBeheer();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Verwijderen mislukte.'); }
+}
+// Wachtwoord instellen voor een admin.
+let wwDoelId=null;
+function openWachtwoord(id, naam){
+  wwDoelId=id;
+  document.getElementById('ww-naam').textContent=naam;
+  document.getElementById('ww-invoer').value='';
+  document.getElementById('overlay-ww').classList.add('open');
+}
+function sluitWachtwoord(){ document.getElementById('overlay-ww').classList.remove('open'); wwDoelId=null; }
+async function bewaarWachtwoord(){
+  if(!wwDoelId) return;
+  const ww=document.getElementById('ww-invoer').value;
+  if(!ww || ww.length<4){ toon('&#9888;&#65039; Minstens 4 tekens'); return; }
+  try{
+    await dbZetAdminWachtwoord(wwDoelId, ww);
+    toon('&#9989; Wachtwoord ingesteld');
+    sluitWachtwoord();
+    await laadMedewerkersBeheer();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Instellen mislukte.'); }
 }
 
 // ============ WIJZIGINGEN ============
+let wijzigingen=[];   // wordt uit de database geladen (fn_recente_wijzigingen)
+
+// Maak van een tijdstempel een korte, leesbare tijd (datum + uur).
+function korteTijd(ts){
+  try{
+    const d=new Date(ts);
+    const vandaag=new Date();
+    const zelfdeDag = d.toDateString()===vandaag.toDateString();
+    const uur = d.toLocaleTimeString('nl-BE',{hour:'2-digit',minute:'2-digit'});
+    if(zelfdeDag) return 'vandaag '+uur;
+    return d.toLocaleDateString('nl-BE',{day:'2-digit',month:'2-digit'})+' '+uur;
+  }catch(e){ return ts; }
+}
+
+async function laadWijzigingen(){
+  const box=document.getElementById('wijz-lijst');
+  box.innerHTML='<div class="leeg">Laden\u2026</div>';
+  try{
+    const data = await dbRecenteWijzigingen(50) || [];
+    wijzigingen = data.map(w=>({
+      tijd: korteTijd(w.gebeurd_op),
+      tekst: w.omschrijving,
+      type: w.handeling,
+      lid: w.lid_naam || '\u2014 (geen lid)',
+      medewerker: w.medewerker_naam || '\u2014',
+    }));
+  }catch(e){ console.error(e); box.innerHTML='<div class="leeg">Laden mislukt.</div>'; return; }
+  tekenWijzigingen();
+}
+
 function zetGroep(modus){
   groepModus=modus;
   document.getElementById('grp-lid').classList.toggle('aan',modus==='lid');
@@ -323,8 +634,15 @@ function tekenWijzigingen(){
   if(wijzigingen.length===0){box.innerHTML='<div class="leeg">Nog geen wijzigingen.</div>';return;}
   const sleutel=groepModus==='lid'?'lid':'medewerker';
   const groepen={};
-  wijzigingen.forEach(w=>{(groepen[w[sleutel]]=groepen[w[sleutel]]||[]).push(w);});
-  Object.keys(groepen).sort().forEach(naam=>{
+  // De data komt al recentste-eerst uit de database; bewaar de volgorde van
+  // eerste verschijning zodat de groep met de meest recente wijziging bovenaan staat.
+  const volgorde=[];
+  wijzigingen.forEach(w=>{
+    const k=w[sleutel];
+    if(!groepen[k]){ groepen[k]=[]; volgorde.push(k); }
+    groepen[k].push(w);
+  });
+  volgorde.forEach(naam=>{
     const g=document.createElement('div');g.className='groep';
     let rijen='';
     groepen[naam].forEach(w=>{
@@ -339,6 +657,17 @@ function tekenWijzigingen(){
 }
 
 // ============ NIEUWE ACCOUNTS ============
+async function laadAccounts(){
+  try{
+    const data = await dbNieuweAccounts() || [];
+    nieuweAccounts = data.map(a=>({
+      id:a.id, voornaam:a.voornaam, achternaam:a.achternaam,
+      jaar:a.geboortejaar, postcode:a.postcode, herkomst:a.herkomst,
+      tijd: a.aangemaakt_op ? korteTijd(a.aangemaakt_op) : '',
+    }));
+  }catch(e){ console.error(e); nieuweAccounts=[]; }
+  tekenAccounts();
+}
 function tekenAccounts(){
   const box=document.getElementById('acc-lijst');
   const teller=document.getElementById('acc-teller');
@@ -350,27 +679,31 @@ function tekenAccounts(){
     const div=document.createElement('div');div.className='acc-kaart';
     div.innerHTML=
       '<div class="acc-kop"><span class="sym">&#128100;</span><span class="acc-naam">'+a.voornaam+' '+a.achternaam+'</span>'
-      +'<span style="font-size:12px;color:var(--grijs)">'+a.tijd+' &#183; '+a.bron+'</span></div>'
+      +(a.tijd?'<span style="font-size:12px;color:var(--grijs)">'+a.tijd+'</span>':'')+'</div>'
       +'<div class="acc-detail">Geboortejaar '+(a.jaar||'?')+' &#183; postcode '+(a.postcode||'?')+' &#183; '+(a.herkomst||'?')+'</div>'
       +'<div class="acc-acties">'
       +'<button class="mini-knop groen" onclick="keurGoed(\''+a.id+'\')">&#10003; Goedkeuren</button>'
-      +'<button class="mini-knop blauw" onclick="bewerkAccount(\''+a.id+'\')">&#9999;&#65039; Bewerken</button>'
       +'<button class="mini-knop rood" onclick="wijsAf(\''+a.id+'\')">&#10005; Afwijzen</button></div>';
     box.appendChild(div);
   });
 }
-function keurGoed(id){
+async function keurGoed(id){
   const a=nieuweAccounts.find(x=>x.id===id);if(!a)return;
-  nieuweAccounts=nieuweAccounts.filter(x=>x.id!==id);
-  tekenAccounts();
-  toon('&#9989; '+a.voornaam+' goedgekeurd');
+  try{
+    await dbKeurAccountGoed(id, HUIDIGE_MEDEWERKER_ID);
+    toon('&#9989; '+a.voornaam+' goedgekeurd');
+    await laadAccounts();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Goedkeuren mislukte.'); }
 }
-function wijsAf(id){
+async function wijsAf(id){
   const a=nieuweAccounts.find(x=>x.id===id);if(!a)return;
-  if(!confirm('Account van '+a.voornaam+' '+a.achternaam+' afwijzen?'))return;
-  nieuweAccounts=nieuweAccounts.filter(x=>x.id!==id);
-  tekenAccounts();
-  toon('&#10005; '+a.voornaam+' afgewezen');
+  const ok=await vraagBevestiging('Account van <b>'+a.voornaam+' '+a.achternaam+'</b> afwijzen?','Ja, afwijzen');
+  if(!ok)return;
+  try{
+    await dbWijsAccountAf(id, HUIDIGE_MEDEWERKER_ID);
+    toon('&#10005; '+a.voornaam+' afgewezen');
+    await laadAccounts();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Afwijzen mislukte.'); }
 }
 function bewerkAccount(id){
   const a=nieuweAccounts.find(x=>x.id===id);if(!a)return;
@@ -402,9 +735,34 @@ function adminUitloggen(){
   setTimeout(()=>{ window.location.href='index.html'; }, 600);
 }
 
-tekenSessies();
-tekenWijzigingen();
-tekenAccounts();
+// Eerst de activiteitenlijst laden, dan de rest tekenen.
+await laadActiviteitenLijst();
+laadSessies();      // sessies uit de database laden en tekenen
+laadWijzigingen();  // recente wijzigingen uit de database
+laadAccounts();     // nieuwe accounts uit de database
+
+// ===========================================================================
+// MODULE-KOPPELING: functies die vanuit HTML (onclick) worden aangeroepen.
+// ===========================================================================
+Object.assign(window, {
+  toonPaneel,
+  // sessies
+  voegMomentToe, verwijderMoment, openNieuweSessie, bewerkSessie,
+  sluitSessieModal, bewaarSessie, verwijderSessie,
+  // bevestiging
+  vraagBevestiging, bevestigJa, bevestigNee,
+  // wijzigingen + accounts
+  tekenWijzigingen, laadWijzigingen, tekenAccounts, laadAccounts, keurGoed, wijsAf, bewerkAccount,
+  sluitAccModal, bewaarAccount, zetGroep,
+  // activiteiten
+  laadActiviteiten, maakActiviteitDb, bewerkActiviteit, deactiveerActiviteitDb,
+  sluitActBewerk, bewaarActBewerk,
+  // medewerkers
+  laadMedewerkersBeheer, maakMedewerkerDb, toggleAdminDb, deactiveerMedewerkerDb,
+  openWachtwoord, sluitWachtwoord, bewaarWachtwoord,
+  // admin
+  adminUitloggen,
+});
 </script>
 </body>
 </html>

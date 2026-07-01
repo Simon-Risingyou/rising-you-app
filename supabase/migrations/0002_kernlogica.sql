@@ -48,6 +48,7 @@ language plpgsql
 as $$
 declare
     v_lid           leden%rowtype;
+    v_lid_id        uuid;
     v_kaartje_id    uuid;
     v_abo           abonnementen%rowtype;
     v_kaart         beurtenkaarten%rowtype;
@@ -60,8 +61,8 @@ declare
     v_checkin_id    uuid;
 begin
     -- 1. Zoek het geldige kaartje bij dit token.
-    select n.id, l.*
-      into v_kaartje_id, v_lid
+    select n.id, n.lid_id
+      into v_kaartje_id, v_lid_id
       from naamkaartjes n
       join leden l on l.id = n.lid_id
      where n.qr_token = p_qr_token
@@ -70,13 +71,15 @@ begin
      limit 1;
 
     if not found then
-        -- Onbekend of ongeldig kaartje: niets aanmaken, gevonden = false.
         return query
             select null::uuid, null::uuid, null::text, null::text, null::text,
                    null::boolean, null::checkin_resultaat, null::integer,
                    null::boolean, null::date, null::boolean, false;
         return;
     end if;
+
+    -- Haal de volledige ledenrij apart op.
+    select * into v_lid from leden where id = v_lid_id;
 
     -- 2. Geldig abonnement vandaag?
     select * into v_abo

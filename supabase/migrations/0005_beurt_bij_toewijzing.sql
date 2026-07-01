@@ -26,6 +26,7 @@ comment on column checkins.geplande_beurtenkaart_id is
 -- fn_verwerk_scan (herzien): trekt GEEN beurt meer af.
 -- Bepaalt groen/rood en onthoudt welke beurtenkaart later afgeboekt wordt.
 -- ----------------------------------------------------------------------------
+drop function if exists fn_verwerk_scan(text, uuid);
 create or replace function fn_verwerk_scan(
     p_qr_token       text,
     p_medewerker_id  uuid
@@ -48,6 +49,7 @@ language plpgsql
 as $$
 declare
     v_lid         leden%rowtype;
+    v_lid_id      uuid;
     v_kaartje_id  uuid;
     v_abo         abonnementen%rowtype;
     v_kaart       beurtenkaarten%rowtype;
@@ -58,7 +60,7 @@ declare
     v_abo_tot     date := null;
     v_checkin_id  uuid;
 begin
-    select n.id, l.* into v_kaartje_id, v_lid
+    select n.id, n.lid_id into v_kaartje_id, v_lid_id
       from naamkaartjes n join leden l on l.id = n.lid_id
      where n.qr_token = p_qr_token and n.geldig and l.actief
      limit 1;
@@ -69,6 +71,8 @@ begin
                             null::boolean,null::date,null::boolean,false;
         return;
     end if;
+
+    select * into v_lid from leden where id = v_lid_id;
 
     -- Geldig abonnement?
     select * into v_abo from abonnementen

@@ -99,19 +99,21 @@
   .qr-kaart .qr-sub{font-size:13px;color:var(--grijs)}
   .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--tekst);color:#fff;padding:13px 20px;border-radius:12px;font-size:16px;display:none;align-items:center;gap:10px;z-index:80;max-width:90vw}
   .toast.open{display:flex}
-  @media print{body *{visibility:hidden}#print-zone,#print-zone *{visibility:visible}#print-zone{position:absolute;left:0;top:0}}
+  /* Het printen gebeurt via een PDF in een verborgen iframe (#print-frame),
+     dus de schermpagina zelf hoeft niets te verbergen bij printen. */
+  #print-frame{position:fixed;right:0;bottom:0;width:0;height:0;border:0;}
 </style>
 </head>
 <body>
 <div class="balk">
   <div class="logo">Rising <span>You</span> — Ledenbeheer</div>
   <div class="tabs">
-    <a class="tab" href="#" onclick="return false" id="tab-checkin">&#128247; Check-in</a>
+    <a class="tab" href="index.html" id="tab-checkin" onclick="window.location.href='index.html';return false">&#128247; Check-in</a>
     <a class="tab actief" href="#" onclick="return false" id="tab-ledenbeheer">&#128100; Ledenbeheer</a>
     <a class="tab admin-tab" id="admin-portaal-tab" href="#" onclick="window.location.href='admin-portaal.html';return false" style="display:none">&#128273; Admin portaal</a>
   </div>
   <div class="medewerker"><span class="sym">&#128100;</span><span>Wie werkt nu?</span>
-    <select id="medewerker" onchange="medewerkerGewijzigd()"><option>Sara</option><option>Mehmet</option><option>Joke</option><option>Lana (admin)</option></select>
+    <select id="medewerker" onchange="medewerkerGewijzigd()"></select>
     <button class="knop knop-grijs" id="admin-knop" style="font-size:14px;padding:8px 12px" onclick="adminKnopActie()"><span class="sym">&#128274;</span> Admin login</button>
   </div>
 </div>
@@ -273,28 +275,84 @@
   </div>
 </div>
 
+<div class="overlay" id="overlay-bevestig">
+  <div class="modal" style="max-width:420px">
+    <h3 id="bevestig-titel"><span class="sym">&#10067;</span> Bevestigen</h3>
+    <p id="bevestig-tekst" style="font-size:15px;color:var(--grijs);margin:10px 0 18px;line-height:1.5"></p>
+    <div style="display:flex;gap:10px">
+      <button class="knop knop-grijs" style="flex:1" onclick="bevestigNee()">Annuleer</button>
+      <button class="knop knop-blauw" style="flex:1" id="bevestig-ja-knop" onclick="bevestigJa()">Ja</button>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="overlay-print">
   <div class="modal" style="max-width:420px">
-    <h3><span class="sym">&#128424;&#65039;</span> Kaartje printen</h3>
-    <p style="font-size:15px;color:var(--grijs);margin-bottom:14px">Het oude kaartje wordt automatisch ongeldig zodra je een nieuw kaartje print.</p>
+    <h3><span class="sym">&#128424;&#65039;</span> Kaartje</h3>
+    <p style="font-size:15px;color:var(--grijs);margin-bottom:14px">Een nieuw kaartje maakt het oude meteen ongeldig. Annuleren behoudt het huidige kaartje.</p>
     <div id="print-zone" style="display:flex;justify-content:center;margin-bottom:16px">
       <div class="qr-kaart">
         <div class="qrcode" id="qr-target"></div>
-        <div><div class="qr-naam" id="qr-naam"></div><div class="qr-sub">Rising You &#8212; klimlidkaart</div></div>
+        <div><div class="qr-naam" id="qr-naam"></div><div class="qr-sub">Rising You &#8212; lidkaart</div></div>
       </div>
     </div>
     <div id="qr-codes-info" style="font-size:13px;color:var(--grijs);text-align:center;margin-bottom:14px"></div>
-    <div style="display:flex;gap:10px">
+    <div id="print-knoppen" style="display:flex;gap:10px">
       <button class="knop knop-grijs" style="flex:1" onclick="sluitPrint()">Annuleer</button>
-      <button class="knop knop-blauw" style="flex:1" onclick="doePrint()"><span class="sym">&#128424;&#65039;</span> Printen</button>
+      <button class="knop knop-blauw" style="flex:1" onclick="maakKaartjeAan()">Ja, nieuw kaartje</button>
     </div>
   </div>
 </div>
 
 <div class="toast" id="toast"></div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-<script>
+<script src="./vendor/qrcode.min.js"></script>
+<script src="./vendor/jspdf.umd.min.js"></script>
+<script type="module">
+// --- Databasekoppeling ---
+import { zoekLeden as dbZoekLeden, haalLid as dbHaalLid,
+         zetTarieftype as dbZetTarieftype, zetSociaalTarief as dbZetSociaalTarief,
+         wijzigLid as dbWijzigLid,
+         laadBeurtenkaart as dbLaadBeurtenkaart, laadAbonnement as dbLaadAbonnement,
+         nieuwKaartje as dbNieuwKaartje,
+         gezinVanLid as dbGezinVanLid, maakGezin as dbMaakGezin,
+         voegToeAanGezin as dbVoegToeAanGezin, verwijderUitGezin as dbVerwijderUitGezin,
+         alleActiviteiten as dbAlleActiviteiten,
+         actieveMedewerkers as dbActieveMedewerkers } from './src/lib/databron.js';
+
+// Tijdelijk: vaste medewerker (Sara uit de testdata), zoals in de check-in.
+// De medewerker die nu werkt. Gekozen via de dropdown, bewaard in sessionStorage
+// zodat de keuze dezelfde is als in de check-in.
+let HUIDIGE_MEDEWERKER_ID = null;
+let MEDEWERKERS = [];
+function leesGekozenMedewerker(){
+  try{ return sessionStorage.getItem('ry_medewerker_id'); }catch(e){ return null; }
+}
+function bewaarGekozenMedewerker(id){
+  try{ sessionStorage.setItem('ry_medewerker_id', id); }catch(e){}
+}
+async function laadMedewerkers(){
+  try{
+    MEDEWERKERS = await dbActieveMedewerkers() || [];
+  }catch(e){ console.error('Medewerkers laden mislukte:',e); MEDEWERKERS=[]; }
+  const sel=document.getElementById('medewerker');
+  if(!sel) return;
+  sel.innerHTML = MEDEWERKERS.map(m=>
+    '<option value="'+m.id+'">'+m.voornaam+(m.is_admin?' (admin)':'')+'</option>'
+  ).join('');
+  const bewaard = leesGekozenMedewerker();
+  if(bewaard && MEDEWERKERS.some(m=>m.id===bewaard)){
+    sel.value = bewaard; HUIDIGE_MEDEWERKER_ID = bewaard;
+  } else if(MEDEWERKERS.length>0){
+    sel.value = MEDEWERKERS[0].id; HUIDIGE_MEDEWERKER_ID = MEDEWERKERS[0].id;
+    bewaarGekozenMedewerker(HUIDIGE_MEDEWERKER_ID);
+  }
+}
+
+// Het lid dat nu in het detailscherm geopend is (uit de database via fn_haal_lid).
+let huidigLid = null;
+let huidigGezin = [];   // de andere gezinsleden van het huidige lid (uit fn_gezin_van_lid)
+
 const LANDEN=[
   {naam:"Afghanistan",code:"AF",vlag:"\uD83C\uDDE6\uD83C\uDDEB",veel:true},
   {naam:"Syri\u00eb",code:"SY",vlag:"\uD83C\uDDF8\uD83C\uDDFE",veel:true},
@@ -328,7 +386,14 @@ const LANDEN=[
 // Elk lid heeft nu MEERDERE beurtenkaarten en abonnementen, elk met een
 // activiteit (klimmen/yoga/workout) en een tarief (kind/student/volwassene).
 // beurtenkaarten: [{activiteit, tarief, beurten}], abonnementen: [{activiteit, tarief, tot}]
-const ACTIVITEITEN=[{code:"klimmen",naam:"Klimmen"},{code:"yoga",naam:"Yoga"},{code:"workout",naam:"We Workout"}];
+// Activiteiten worden uit de database geladen (fn_alle_activiteiten).
+let ACTIVITEITEN=[{code:"klimmen",naam:"Klimmen"},{code:"yoga",naam:"Yoga"},{code:"workout",naam:"We Workout"}];
+async function laadActiviteitenLijst(){
+  try{
+    const lijst = await dbAlleActiviteiten() || [];
+    if(lijst.length>0) ACTIVITEITEN = lijst.map(a=>({code:a.code, naam:a.naam, gratis:a.gratis}));
+  }catch(e){ console.error('Activiteiten laden mislukte:',e); }
+}
 let leden=[
   {id:"guy",   voornaam:"Guy",   achternaam:"Janssens",jaar:1985, postcode:"2018", herkomst:"Belgi\u00eb",  herkomstCode:"BE", sociaal:false, foto:null, tariefHandmatig:null, qr:"RY-guy", gezinId:"g1", gezinRol:"voogd",
     beurtenkaarten:[{activiteit:"klimmen",tarief:"volwassene",beurten:12}], abonnementen:[{activiteit:"yoga",tarief:"volwassene",tot:"2026-12-31"}]},
@@ -362,48 +427,245 @@ function aboTotVoor(l,activiteit){const a=(l.abonnementen||[]).filter(x=>x.activ
 function beurtenVoor(l,activiteit){return (l.beurtenkaarten||[]).filter(k=>k.activiteit===activiteit).reduce((s,k)=>s+k.beurten,0);}
 let gekozenId=null, landDoel=null, camStream=null, camFotoData=null;
 
-function medewerker(){return document.getElementById('medewerker').value;}
+function medewerker(){
+  const m=MEDEWERKERS.find(x=>x.id===HUIDIGE_MEDEWERKER_ID);
+  return m ? m.voornaam : '';
+}
 function logHandeling(h,lidId){console.log('[LOG]',new Date().toLocaleTimeString('nl-BE'),medewerker(),'-',h,'(lid:'+lidId+')');}
 function fmt(d){return d?new Date(d).toLocaleDateString('nl-BE',{day:'numeric',month:'short',year:'numeric'}):'';}
 function aboGeldig(l){return l.abo&&new Date(l.abo)>=new Date();}
 let toastTimer;
 function toon(t){const el=document.getElementById('toast');el.innerHTML=t;el.classList.add('open');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('open'),2800);}
 
-function tekenLeden(){
-  const q=document.getElementById('zoekinput').value.trim().toLowerCase();
+async function tekenLeden(){
+  const q=document.getElementById('zoekinput').value.trim();
   const box=document.getElementById('ledenlijst');
-  const lijst=leden.filter(l=>(l.voornaam+' '+l.achternaam).toLowerCase().includes(q));
+  box.innerHTML='<div class="leeg">Zoeken\u2026</div>';
+  let lijst=[];
+  try{
+    lijst = await dbZoekLeden(q);   // fn_zoek_leden: [{lid_id,voornaam,achternaam,foto_pad,sociaal_tarief,is_eenmalig,beurten_resterend,abonnement_tot}]
+  }catch(e){ console.error('Zoeken mislukte:',e); box.innerHTML='<div class="leeg">Zoeken mislukt.</div>'; return; }
   box.innerHTML='';
-  if(lijst.length===0){box.innerHTML='<div class="leeg">Geen leden gevonden.</div>';return;}
+  if(!Array.isArray(lijst) || lijst.length===0){box.innerHTML='<div class="leeg">Geen leden gevonden.</div>';return;}
   lijst.forEach(l=>{
-    const klim=beurtenVoor(l,'klimmen'); const aboK=aboGeldigVoor(l,'klimmen');
-    const st=aboK?'Abonnement klimmen':(klim>0?klim+' klimbeurten':'Geen klimtegoed');
-    const r=document.createElement('div');r.className='ledenrij'+(l.id===gekozenId?' gekozen':'');
-    const av=l.foto?'<img src="'+l.foto+'">':'&#128100;';
-    r.innerHTML='<div class="avatar">'+av+'</div><div class="nm">'+l.voornaam+' '+l.achternaam+'<div class="st">'+st+'</div></div>';
-    r.onclick=()=>kiesLid(l.id);
+    // Korte tegoed-indicatie (samenvatting; het detailscherm toont alles per activiteit).
+    let st;
+    if(l.abonnement_tot) st='Abonnement t.e.m. '+fmt(l.abonnement_tot);
+    else if(l.beurten_resterend>0) st=l.beurten_resterend+' beurten';
+    else st='Geen tegoed';
+    const r=document.createElement('div');r.className='ledenrij'+(l.lid_id===gekozenId?' gekozen':'');
+    const av=l.foto_pad?'<img src="'+l.foto_pad+'">':'&#128100;';
+    r.innerHTML='<div class="avatar">'+av+'</div><div class="nm">'+l.voornaam+' '+l.achternaam
+      +(l.sociaal_tarief?' <span style="font-size:12px;color:var(--oranje)">&#183; sociaal</span>':'')
+      +'<div class="st">'+st+'</div></div>';
+    r.onclick=()=>kiesLid(l.lid_id);
     box.appendChild(r);
   });
 }
 
-function kiesLid(id){gekozenId=id;beurtTeller=0;aboKeuze=null;tekenLeden();tekenDetail();}
+async function kiesLid(id){
+  gekozenId=id;beurtTeller=0;aboKeuze=null;
+  // Haal het volledige lid op uit de database (gegevens + tegoed per activiteit).
+  try{
+    huidigLid = await dbHaalLid(id);
+  }catch(e){ console.error('Lid ophalen mislukte:',e); huidigLid=null; }
+  // Haal de andere gezinsleden op (leeg als het lid niet in een gezin zit).
+  try{
+    huidigGezin = await dbGezinVanLid(id) || [];
+  }catch(e){ console.error('Gezin ophalen mislukte:',e); huidigGezin=[]; }
+  tekenLeden();tekenDetail();
+}
+
+// Tijdelijke melding voor knoppen die in een latere stap gekoppeld worden.
+function nogNiet(){ toon('&#9881;&#65039; Deze functie koppelen we in een volgende stap.'); }
+
+// Nette bevestigingspopup in de stijl van de app. Geeft een Promise<boolean>.
+let _bevestigResolve=null;
+function vraagBevestiging(tekst, jaLabel){
+  document.getElementById('bevestig-tekst').innerHTML=tekst;
+  document.getElementById('bevestig-ja-knop').textContent=jaLabel||'Ja';
+  document.getElementById('overlay-bevestig').classList.add('open');
+  return new Promise(resolve=>{ _bevestigResolve=resolve; });
+}
+function bevestigJa(){
+  document.getElementById('overlay-bevestig').classList.remove('open');
+  if(_bevestigResolve){ _bevestigResolve(true); _bevestigResolve=null; }
+}
+function bevestigNee(){
+  document.getElementById('overlay-bevestig').classList.remove('open');
+  if(_bevestigResolve){ _bevestigResolve(false); _bevestigResolve=null; }
+}
+
+// --- Bewerk-acties (database) ---
+async function bewaarGegevensDb(){
+  if(!huidigLid) return;
+  const jaarRaw=document.getElementById('d-jaar').value.trim();
+  const velden={
+    voornaam: document.getElementById('d-voornaam').value.trim(),
+    achternaam: document.getElementById('d-achternaam').value.trim(),
+    geboortejaar: jaarRaw? parseInt(jaarRaw,10) : null,
+    postcode: document.getElementById('d-postcode').value.trim(),
+    herkomst: document.getElementById('d-herkomst').value.trim(),
+  };
+  try{
+    await dbWijzigLid(huidigLid.id, velden, HUIDIGE_MEDEWERKER_ID);
+    toon('&#10003; Gegevens bewaard');
+    huidigLid = await dbHaalLid(huidigLid.id);   // verversen
+    tekenLeden(); tekenDetail();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Bewaren mislukte.'); }
+}
+
+async function zetTariefDb(tarief){
+  if(!huidigLid) return;
+  try{
+    await dbZetTarieftype(huidigLid.id, tarief, HUIDIGE_MEDEWERKER_ID);
+    toon('&#10003; Tarieftype: '+tarief);
+    huidigLid = await dbHaalLid(huidigLid.id);
+    tekenLeden(); tekenDetail();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Wijzigen mislukte.'); }
+}
+
+async function toggleSociaalDb(){
+  if(!huidigLid) return;
+  const nieuw = !huidigLid.sociaal_tarief;
+  try{
+    await dbZetSociaalTarief(huidigLid.id, nieuw, HUIDIGE_MEDEWERKER_ID);
+    toon('&#10003; Sociaal tarief '+(nieuw?'aan':'uit'));
+    huidigLid = await dbHaalLid(huidigLid.id);
+    tekenLeden(); tekenDetail();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Wijzigen mislukte.'); }
+}
+
+async function voegBeurtenkaartToe(){
+  if(!huidigLid) return;
+  const act=document.getElementById('tg-activiteit').value;
+  const aantal=parseInt(document.getElementById('tg-aantal').value,10);
+  if(!aantal || aantal<1){ toon('&#9888;&#65039; Geef een geldig aantal beurten.'); return; }
+  try{
+    // tarief null => database gebruikt het tarieftype van het lid
+    await dbLaadBeurtenkaart(huidigLid.id, aantal, act, null, HUIDIGE_MEDEWERKER_ID);
+    toon('&#10003; Beurtenkaart toegevoegd: '+aantal+' '+activiteitNaam(act));
+    huidigLid = await dbHaalLid(huidigLid.id);
+    tekenLeden(); tekenDetail();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Toevoegen mislukte.'); }
+}
+
+async function voegAbonnementToe(){
+  if(!huidigLid) return;
+  const act=document.getElementById('tg-activiteit').value;
+  const duur=document.getElementById('tg-duur').value;
+  const vandaag=new Date().toISOString().slice(0,10);
+  try{
+    await dbLaadAbonnement(huidigLid.id, duur, vandaag, act, null, HUIDIGE_MEDEWERKER_ID);
+    toon('&#10003; Abonnement toegevoegd: '+activiteitNaam(act));
+    huidigLid = await dbHaalLid(huidigLid.id);
+    tekenLeden(); tekenDetail();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Toevoegen mislukte.'); }
+}
+
+// --- Gezin beheren (database) ---
+async function maakGezinDb(){
+  if(!huidigLid) return;
+  // Naam wordt automatisch bepaald; de medewerker hoeft niets in te vullen.
+  const naam='Gezin '+(huidigLid.achternaam||huidigLid.voornaam||'');
+  try{
+    const gezinId = await dbMaakGezin(naam, HUIDIGE_MEDEWERKER_ID);
+    // Voeg dit lid meteen toe als voogd.
+    await dbVoegToeAanGezin(gezinId, huidigLid.id, 'voogd', HUIDIGE_MEDEWERKER_ID);
+    toon('&#10003; Gezin aangemaakt');
+    await herlaadHuidigLid();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Gezin aanmaken mislukte.'); }
+}
+
+async function haalUitGezinDb(lidId){
+  try{
+    await dbVerwijderUitGezin(lidId, HUIDIGE_MEDEWERKER_ID);
+    toon('&#10003; Lid uit gezin gehaald');
+    await herlaadHuidigLid();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Verwijderen mislukte.'); }
+}
+
+// Zoek leden om aan het gezin toe te voegen (sluit huidige gezinsleden uit).
+let gezinZoekTimer=null;
+function zoekGezinKandidaten(){
+  clearTimeout(gezinZoekTimer);
+  gezinZoekTimer=setTimeout(async ()=>{
+    const q=document.getElementById('gezin-zoek').value.trim();
+    const box=document.getElementById('gezin-resultaten');
+    if(!box) return;
+    if(q.length<2){ box.innerHTML='<div style="font-size:12px;color:var(--grijs)">Typ minstens 2 letters\u2026</div>'; return; }
+    let lijst=[];
+    try{ lijst = await dbZoekLeden(q) || []; }catch(e){ console.error(e); }
+    // Sluit het lid zelf en de bestaande gezinsleden uit.
+    const bestaande=new Set([huidigLid.id, ...huidigGezin.map(g=>g.lid_id)]);
+    lijst=lijst.filter(x=>!bestaande.has(x.lid_id));
+    if(lijst.length===0){ box.innerHTML='<div style="font-size:12px;color:var(--grijs)">Geen leden gevonden.</div>'; return; }
+    box.innerHTML=lijst.slice(0,6).map(x=>{
+      const alInGezin = !!x.gezin_id;
+      const markering = alInGezin
+        ? '<div style="font-size:11px;color:var(--oranje)">&#9888;&#65039; zit al in een gezin</div>'
+        : '';
+      return '<div style="display:flex;align-items:center;gap:8px;padding:6px;border:1px solid var(--lijn);border-radius:8px;margin-bottom:4px">'
+        +'<div style="flex:1">'+x.voornaam+' '+x.achternaam+markering+'</div>'
+        +'<select id="rol-'+x.lid_id+'" style="padding:5px;border:1px solid var(--lijn);border-radius:6px;font-size:13px"><option value="lid">lid</option><option value="kind">kind</option><option value="voogd">voogd</option></select>'
+        +'<button class="knop knop-blauw" style="font-size:13px;padding:5px 10px" onclick="voegLidAanGezinToe(\''+x.lid_id+'\','+(alInGezin?'true':'false')+')">Toevoegen</button>'
+        +'</div>';
+    }).join('');
+  }, 250);
+}
+
+async function voegLidAanGezinToe(lidId, alInGezin){
+  const gezinId=document.getElementById('gezin-actief-id').value;
+  const rol=document.getElementById('rol-'+lidId).value;
+  // Als de persoon al in een ander gezin zit: eerst bevestiging vragen.
+  if(alInGezin){
+    const ok = await vraagBevestiging(
+      'Deze persoon zit al in een ander gezin.<br><br>Wil je hem of haar uit dat gezin halen en naar dit gezin verplaatsen?',
+      'Ja, verplaatsen');
+    if(!ok) return;   // geannuleerd: er gebeurt niets
+  }
+  try{
+    await dbVoegToeAanGezin(gezinId, lidId, rol, HUIDIGE_MEDEWERKER_ID);
+    toon(alInGezin ? '&#10003; Lid verplaatst naar dit gezin' : '&#10003; Lid toegevoegd aan gezin');
+    await herlaadHuidigLid();
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Toevoegen mislukte.'); }
+}
+
+// Herlaad het huidige lid + gezin en herteken.
+async function herlaadHuidigLid(){
+  if(!huidigLid) return;
+  try{
+    huidigLid = await dbHaalLid(huidigLid.id);
+    huidigGezin = await dbGezinVanLid(huidigLid.id) || [];
+  }catch(e){ console.error(e); }
+  tekenLeden(); tekenDetail();
+}
 
 function tekenDetail(){
-  const l=leden.find(x=>x.id===gekozenId);
+  const l=huidigLid;
   document.getElementById('detail-leeg').style.display=l?'none':'flex';
   const d=document.getElementById('detail');
   d.style.display=l?'block':'none';
   if(!l)return;
-  const av=l.foto?'<img src="'+l.foto+'">':'&#128100;';
-  const land=LANDEN.find(x=>x.code===l.herkomstCode);
-  const landTekst=land?(land.vlag+' '+land.naam):(l.herkomst||'Kies een land\u2026');
+
+  const av=l.foto_pad?'<img src="'+l.foto_pad+'">':'&#128100;';
+  const leeftijd=l.geboortejaar?(new Date().getFullYear()-l.geboortejaar)+' jaar':'';
+  // Tegoed per activiteit uit de database (enkel betalende activiteiten).
+  const tegoedHtml = ACTIVITEITEN.filter(act=>!act.gratis).map(act=>{
+    const abo=(l.abonnementen||[]).find(a=>a.activiteit===act.code && a.eind_datum && new Date(a.eind_datum)>=new Date());
+    const beurten=(l.beurtenkaarten||[]).filter(k=>k.activiteit===act.code).reduce((s,k)=>s+(k.beurten_resterend||0),0);
+    let waarde;
+    if(abo) waarde='<span style="color:var(--groen);font-weight:600">Abonnement t.e.m. '+fmt(abo.eind_datum)+'</span>';
+    else if(beurten>0) waarde='<b>'+beurten+'</b> beurten';
+    else waarde='<span style="color:var(--grijs)">Geen tegoed</span>';
+    return '<div class="veld-rij" style="margin:0"><div class="veld"><label>'+act.naam+'</label><div style="padding:6px 0">'+waarde+'</div></div></div>';
+  }).join('');
+
   d.innerHTML=
    '<div class="detail-kop">'
    +'<div class="detail-avatar">'+av+'</div>'
    +'<div><div class="detail-naam">'+l.voornaam+' '+l.achternaam+'</div>'
-   +'<div class="detail-sub">'+(l.jaar?(new Date().getFullYear()-l.jaar)+' jaar':'')+(l.sociaal?' &#183; sociaal tarief':'')+'</div>'
-   +'<button class="knop knop-grijs" style="margin-top:8px;font-size:14px;padding:8px 12px" onclick="openFotoKeuze()"><span class="sym">&#128247;</span> '+(l.foto?'Foto wijzigen':'Foto toevoegen')+'</button>'
-   + (l.foto?'<button class="knop knop-rood-omlijnd" style="margin-top:8px;margin-left:6px;font-size:14px;padding:8px 12px" onclick="verwijderFoto()"><span class="sym">&#128465;&#65039;</span> Foto weg</button>':'')
+   +'<div class="detail-sub">'+leeftijd+(l.sociaal_tarief?' &#183; sociaal tarief (A-Kaart)':'')+'</div>'
    +'</div>'
    +'</div>'
 
@@ -412,25 +674,84 @@ function tekenDetail(){
    +'<div class="veld"><label>Voornaam</label><input id="d-voornaam" value="'+(l.voornaam||'')+'"></div>'
    +'<div class="veld"><label>Achternaam</label><input id="d-achternaam" value="'+(l.achternaam||'')+'"></div></div>'
    +'<div class="veld-rij">'
-   +'<div class="veld"><label>Geboortejaar</label><input id="d-jaar" type="number" value="'+(l.jaar||'')+'"></div>'
-   +'<div class="veld"><label>Postcode</label><input id="d-postcode" value="'+(l.postcode||'')+'"></div></div>'
-   +'<div class="veld"><label>Land van herkomst</label>'
-   +'<button type="button" class="land-knop'+(l.herkomstCode?' gekozen':'')+'" id="d-land-knop" onclick="openLandKiezer(\'detail\')"><span id="d-land-tekst">'+landTekst+'</span><span class="sym">&#9662;</span></button></div>'
-   +'<label class="toggle" style="margin-top:6px"><span class="switch'+(l.sociaal?' aan':'')+'" id="d-sociaal-switch" onclick="toggleSociaal()"></span> Sociaal tarief (A-Kaart nodig)</label>'
-   + tariefSectieHTML(l)
-   +'<button class="knop knop-blauw knop-groot" style="margin-top:14px" onclick="bewaarGegevens()"><span class="sym">&#10003;</span> Gegevens bewaren</button>'
+   +'<div class="veld"><label>Geboortejaar</label><input id="d-jaar" type="number" value="'+(l.geboortejaar||'')+'"></div>'
+   +'<div class="veld"><label>Postcode (woonplaats)</label><input id="d-postcode" value="'+(l.postcode||'')+'"></div></div>'
+   +'<div class="veld"><label>Land van herkomst</label><input id="d-herkomst" value="'+(l.herkomst||'')+'"></div>'
+   +'<button class="knop knop-blauw knop-groot" style="margin-top:14px" onclick="bewaarGegevensDb()"><span class="sym">&#10003;</span> Gegevens bewaren</button>'
    +'</div>'
 
-   + lidmaatschapSectieHTML(l)
-   + sessieHistoriekHTML(l)
+   +'<div class="sectie"><h3><span class="sym">&#127991;&#65039;</span> Tarief</h3>'
+   +'<div class="veld"><label>Tarieftype</label>'
+   +'<div class="tarief-keuze" style="display:flex;gap:8px;margin-top:6px">'
+   + ['kind','student','volwassene'].map(t=>
+       '<button class="knop '+(l.tarieftype_effectief===t?'knop-blauw':'knop-grijs')+'" style="flex:1;font-size:14px;padding:8px" onclick="zetTariefDb(\''+t+'\')">'+t+'</button>'
+     ).join('')
+   +'</div></div>'
+   +'<label class="toggle" style="margin-top:12px"><span class="switch'+(l.sociaal_tarief?' aan':'')+'" onclick="toggleSociaalDb()"></span> Sociaal tarief (A-Kaart nodig)</label>'
+   +'</div>'
+
+   +'<div class="sectie"><h3><span class="sym">&#127903;&#65039;</span> Tegoed</h3>'
+   + tegoedHtml
+   +'<div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--lijn)">'
+   +'<div class="veld"><label>Activiteit</label>'
+   +'<select id="tg-activiteit" style="width:100%;padding:9px;border:1px solid var(--lijn);border-radius:8px;font-size:15px">'
+   + ACTIVITEITEN.filter(a=>!a.gratis).map(a=>'<option value="'+a.code+'">'+a.naam+'</option>').join('')
+   +'</select></div>'
+   +'<div class="veld-rij" style="margin-top:10px">'
+   +'<div class="veld"><label>Beurtenkaart: aantal beurten</label><input id="tg-aantal" type="number" min="1" value="10"></div>'
+   +'<div class="veld" style="flex:0 0 auto"><label style="visibility:hidden">.</label><button class="knop knop-blauw" style="white-space:nowrap" onclick="voegBeurtenkaartToe()"><span class="sym">&#10133;</span> Voeg beurtenkaart toe</button></div></div>'
+   +'<div class="veld-rij" style="margin-top:12px">'
+   +'<div class="veld"><label>Abonnement: duur</label>'
+   +'<select id="tg-duur" style="width:100%;padding:9px;border:1px solid var(--lijn);border-radius:8px;font-size:15px">'
+   +'<option value="3_maanden">3 maanden</option><option value="6_maanden">6 maanden</option><option value="12_maanden">12 maanden</option>'
+   +'</select></div>'
+   +'<div class="veld" style="flex:0 0 auto"><label style="visibility:hidden">.</label><button class="knop knop-blauw" style="white-space:nowrap" onclick="voegAbonnementToe()"><span class="sym">&#10133;</span> Voeg abonnement toe</button></div></div>'
+   +'<div style="font-size:12px;color:var(--grijs);margin-top:8px">Het tarief volgt automatisch het tarieftype van het lid ('+(l.tarieftype_effectief||'?')+').</div>'
+   +'</div>'
    +'</div>'
 
    +'<div class="sectie"><h3><span class="sym">&#128179;</span> Kaartje</h3>'
-   +'<div style="font-size:14px;color:var(--grijs);margin-bottom:10px">Huidige code: <b>'+(l.qr||'geen')+'</b></div>'
-   +'<button class="knop knop-blauw knop-groot" onclick="openPrint()"><span class="sym">&#128424;&#65039;</span> Nieuw kaartje printen (oude wordt ongeldig)</button>'
+   +'<div style="font-size:13px;color:var(--grijs);margin-bottom:10px">Maak een nieuw QR-kaartje aan, bijvoorbeeld bij verlies. <b>Let op:</b> alle oude kaartjes van dit lid worden hierbij meteen ongeldig.</div>'
+   +'<button class="knop knop-blauw knop-groot" onclick="openPrint()"><span class="sym">&#128424;&#65039;</span> Nieuw kaartje aanmaken en printen</button>'
    +'</div>'
-   + gezinSectieHTML(l)
-   + adminVerwijderHTML(l);
+
+   + gezinSectieHtml(l)
+   +'</div>';
+}
+
+// Bouwt de gezin-sectie: toont het hele gezin met rollen, of opties om een
+// gezin aan te maken / het lid aan een gezin toe te voegen.
+function gezinSectieHtml(l){
+  const inGezin = l.gezinsleden && l.gezinsleden.length>0;
+  let h='<div class="sectie"><h3><span class="sym">&#128106;</span> Gezin</h3>';
+  if(inGezin){
+    const gezinId=l.gezinsleden[0].gezin_id;
+    const eigenRol=l.gezinsleden[0].rol;
+    // Volledig gezin = de andere leden (huidigGezin) + het lid zelf.
+    const allen=[
+      {lid_id:l.id, voornaam:l.voornaam, achternaam:l.achternaam, rol:eigenRol, zelf:true},
+      ...huidigGezin.map(g=>({...g, zelf:false})),
+    ];
+    h+='<div style="font-size:13px;color:var(--grijs);margin-bottom:10px">Dit lid zit in een gezin. Hieronder alle gezinsleden met hun rol.</div>';
+    allen.forEach(p=>{
+      h+='<div style="display:flex;align-items:center;gap:8px;padding:8px;border:1px solid var(--lijn);border-radius:8px;margin-bottom:6px">'
+        +'<div style="flex:1"><b>'+p.voornaam+' '+p.achternaam+'</b>'+(p.zelf?' <span style="font-size:12px;color:var(--blauw)">(dit lid)</span>':'')+'<div style="font-size:12px;color:var(--grijs)">rol: '+p.rol+'</div></div>'
+        +'<button class="knop knop-rood-omlijnd" style="font-size:13px;padding:6px 10px" onclick="haalUitGezinDb(\''+p.lid_id+'\')">Uit gezin</button>'
+        +'</div>';
+    });
+    // Lid toevoegen via zoekveld.
+    h+='<div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--lijn)">'
+      +'<label style="font-size:13px;color:var(--grijs)">Lid toevoegen aan dit gezin</label>'
+      +'<input id="gezin-zoek" placeholder="Zoek een lid op naam\u2026" oninput="zoekGezinKandidaten()" style="width:100%;margin-top:6px">'
+      +'<div id="gezin-resultaten" style="margin-top:6px"></div>'
+      +'<input type="hidden" id="gezin-actief-id" value="'+gezinId+'"></div>';
+  } else {
+    h+='<div style="font-size:14px;color:var(--grijs);margin-bottom:10px">Dit lid zit nog niet in een gezin.</div>'
+      +'<button class="knop knop-blauw knop-groot" onclick="maakGezinDb()"><span class="sym">&#10133;</span> Maak een gezin met dit lid</button>'
+      +'<div style="font-size:12px;color:var(--grijs);margin-top:6px">Dit lid wordt het eerste gezinslid (rol: voogd). Daarna kun je anderen toevoegen.</div>';
+  }
+  h+='</div>';
+  return h;
 }
 
 // --- Gezin-sectie in het detailscherm ---
@@ -681,13 +1002,16 @@ function ongedaan(lidId,index){
 // Admin-modus blijft actief tot afmelden of na 10 min inactiviteit.
 // In de echte app gebeurt de wachtwoordcontrole via Supabase Auth.
 // ===========================================================================
-const ADMIN_RECHTEN={ 'Lana (admin)': true };   // wie mag admin worden
+// wie mag admin worden: bepaald door is_admin uit de database
 const DEMO_WACHTWOORD='rising';                  // alleen voor het prototype
 const ADMIN_TIMEOUT=10*60*1000;                  // 10 minuten
 let adminModusActief=false, adminTimer=null;
 try{ if(sessionStorage.getItem('ry_admin')==='1') adminModusActief=true; }catch(e){}
 
-function medewerkerMagAdmin(){ return ADMIN_RECHTEN[medewerker()]===true; }
+function medewerkerMagAdmin(){
+  const m=MEDEWERKERS.find(x=>x.id===HUIDIGE_MEDEWERKER_ID);
+  return !!(m && m.is_admin);
+}
 function isAdmin(){ return adminModusActief && medewerkerMagAdmin(); }
 
 function adminKnopActie(){
@@ -750,6 +1074,9 @@ function startAdminTimer(){
 
 // Wisselen van medewerker sluit admin-modus (andere persoon achter de kassa).
 function medewerkerGewijzigd(){
+  const sel=document.getElementById('medewerker');
+  HUIDIGE_MEDEWERKER_ID = sel.value;
+  bewaarGekozenMedewerker(HUIDIGE_MEDEWERKER_ID);
   if(adminModusActief){ adminModusActief=false; if(adminTimer)clearTimeout(adminTimer); }
   werkAdminKnopBij();
   if(gekozenId)tekenDetail();
@@ -996,37 +1323,135 @@ function sluitCam(){
 }
 
 let nieuweQrCode=null;
+// Stap 1: vraag bevestiging. Er gebeurt nog NIETS in de database.
 function openPrint(){
-  const l=leden.find(x=>x.id===gekozenId);if(!l)return;
-  // Genereer de NIEUWE code, maar pas hem nog niet toe (pas bij effectief printen).
-  nieuweQrCode="RY-"+Math.random().toString(16).slice(2,10);
-  document.getElementById('qr-naam').textContent=l.voornaam+' '+l.achternaam;
-  const t=document.getElementById('qr-target');t.innerHTML='';
-  new QRCode(t,{text:nieuweQrCode,width:96,height:96});
-  // Toon ter info de oude en de nieuwe code in het venster.
+  if(!huidigLid) return;
+  const naam=huidigLid.voornaam+' '+huidigLid.achternaam;
+  document.getElementById('qr-naam').textContent=naam;
+  // Toon de bevestigingsvraag; verberg de QR tot er bevestigd is.
+  const t=document.getElementById('qr-target'); if(t) t.innerHTML='';
   const info=document.getElementById('qr-codes-info');
-  if(info) info.innerHTML='Oude code: <b>'+(l.qr||'geen')+'</b> &#8594; Nieuwe code: <b>'+nieuweQrCode+'</b>';
+  if(info) info.innerHTML='<b>Nieuw kaartje aanmaken voor '+naam+'?</b><br>Het oude kaartje wordt dan ongeldig. Annuleren behoudt het huidige kaartje.';
+  // Knoppenbalk in de bevestigingsmodus zetten.
+  const balk=document.getElementById('print-knoppen');
+  if(balk) balk.innerHTML=
+      '<button class="knop knop-grijs" style="flex:1" onclick="sluitPrint()">Annuleer</button>'
+     +'<button class="knop knop-blauw" style="flex:1" onclick="maakKaartjeAan()">Ja, nieuw kaartje</button>';
   document.getElementById('overlay-print').classList.add('open');
 }
+
+// Stap 2: nu pas het kaartje aanmaken (failsafe gebeurt hier) en de QR tonen.
+async function maakKaartjeAan(){
+  if(!huidigLid) return;
+  let nieuwToken;
+  try{
+    nieuwToken = await dbNieuwKaartje(huidigLid.id, HUIDIGE_MEDEWERKER_ID);
+  }catch(e){ console.error(e); toon('&#9888;&#65039; Kon geen nieuw kaartje aanmaken.'); return; }
+  nieuweQrCode = nieuwToken;
+  const t=document.getElementById('qr-target'); t.innerHTML='';
+  new QRCode(t,{text:nieuwToken,width:96,height:96});
+  const info=document.getElementById('qr-codes-info');
+  if(info) info.innerHTML='Nieuwe code is actief. <b>Alle oude kaartjes van dit lid zijn nu ongeldig.</b>';
+  // Knoppen omschakelen naar printen/sluiten.
+  const balk=document.getElementById('print-knoppen');
+  if(balk) balk.innerHTML=
+      '<button class="knop knop-grijs" style="flex:1" onclick="sluitPrint()">Sluiten</button>'
+     +'<button class="knop knop-blauw" style="flex:1" onclick="doePrint()"><span class="sym">&#128424;&#65039;</span> Printen</button>';
+  toon('&#10003; Nieuw kaartje aangemaakt');
+}
+
 function sluitPrint(){
-  // Annuleren: nieuwe code vervalt, het bestaande kaartje blijft geldig.
+  // Annuleren of sluiten: als er nog niets is aangemaakt, blijft het oude kaartje geldig.
   nieuweQrCode=null;
   document.getElementById('overlay-print').classList.remove('open');
 }
+// Haal de QR als afbeelding (dataURL) uit het canvas dat QRCode maakte.
+function qrAlsDataUrl(){
+  const t=document.getElementById('qr-target');
+  const canvas=t.querySelector('canvas');
+  if(canvas) return canvas.toDataURL('image/png');
+  const img=t.querySelector('img');
+  if(img && img.src) return img.src;   // qrcodejs maakt soms een img i.p.v. canvas
+  return null;
+}
+
 function doePrint(){
-  const l=leden.find(x=>x.id===gekozenId);if(!l||!nieuweQrCode)return;
-  // NU pas de nieuwe code definitief toepassen: het oude kaartje wordt ongeldig.
-  l.qr=nieuweQrCode;
-  logHandeling('kaartje_geprint_oude_ongeldig',l.id);
-  window.print();
-  nieuweQrCode=null;
+  if(!nieuweQrCode || !huidigLid) return;
+  const qrData=qrAlsDataUrl();
+  if(!qrData){ toon('&#9888;&#65039; QR-code nog niet klaar, probeer opnieuw.'); return; }
+
+  // jsPDF: kaart van 85 x 54 mm (standaard visitekaartje), liggend.
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'landscape', unit:'mm', format:[85,54] });
+
+  // QR links, vierkant van 34 mm, verticaal gecentreerd.
+  const qrmm=34, qrx=8, qry=(54-qrmm)/2;
+  doc.addImage(qrData, 'PNG', qrx, qry, qrmm, qrmm);
+
+  // Naam + ondertitel rechts van de QR.
+  const tx=qrx+qrmm+6;
+  doc.setFont('helvetica','bold'); doc.setFontSize(15);
+  doc.setTextColor(40,40,40);
+  doc.text(huidigLid.voornaam+' '+huidigLid.achternaam, tx, 26, { maxWidth: 85-tx-4 });
+  doc.setFont('helvetica','normal'); doc.setFontSize(9);
+  doc.setTextColor(120,120,120);
+  doc.text('Rising You \u2014 lidkaart', tx, 33);
+
+  // Open de PDF in een verborgen iframe en roep de printdialoog op.
+  const blobUrl = doc.output('bloburl');
+  let frame = document.getElementById('print-frame');
+  if(!frame){
+    frame=document.createElement('iframe');
+    frame.id='print-frame';
+    frame.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+    document.body.appendChild(frame);
+  }
+  frame.src=blobUrl;
+  frame.onload=()=>{
+    try{ frame.contentWindow.focus(); frame.contentWindow.print(); }
+    catch(e){ console.error('Printen mislukte:',e); window.open(blobUrl,'_blank'); }
+  };
+
   document.getElementById('overlay-print').classList.remove('open');
-  tekenDetail();
-  toon('&#128424;&#65039; Kaartje geprint &#8212; nieuwe code actief, oude is nu ongeldig');
+  toon('&#128424;&#65039; Kaartje klaar om te printen &#8212; nieuwe code actief');
+  nieuweQrCode=null;
 }
 
 werkAdminKnopBij();
+await laadMedewerkers();          // vul de kiezer en herstel de keuze uit de check-in
+await laadActiviteitenLijst();   // activiteiten uit de database (betalend gefilterd waar nodig)
 tekenLeden();
+
+// ===========================================================================
+// MODULE-KOPPELING: functies die vanuit HTML (onclick/oninput) worden
+// aangeroepen, beschikbaar maken op window.
+// ===========================================================================
+Object.assign(window, {
+  // zoeken + detail
+  tekenLeden, kiesLid, tekenDetail, nogNiet,
+  vraagBevestiging, bevestigJa, bevestigNee,
+  // bewerken (database)
+  bewaarGegevensDb, zetTariefDb, toggleSociaalDb,
+  voegBeurtenkaartToe, voegAbonnementToe,
+  // gezin beheren (database)
+  maakGezinDb, haalUitGezinDb, zoekGezinKandidaten, voegLidAanGezinToe,
+  // medewerker / admin
+  medewerkerGewijzigd, adminKnopActie, doeAdminLogin, sluitAdminLogin,
+  // landkiezer (gedeeld)
+  openLandKiezer, sluitLandKiezer, tekenLanden,
+  // nog-te-koppelen bewerk-functies (blijven voorlopig lokaal/uitgeschakeld)
+  nieuwLid, bewaarGegevens, toggleSociaal, zetTarief,
+  openToevoegBeurt, tbTel, tbReset, tbBevestig,
+  openToevoegAbo, taKies, taBevestig,
+  openGezinMaken, bevestigGezinMaken, openGezinToevoegen, tekenGezinZoek,
+  vraagRol, kiesRol, sluitRol, sluitGezin, haalUitGezin, verwijderLid,
+  ongedaan,
+  // foto / camera / print
+  openFotoKeuze, verwijderFoto, sluitFotoKeuze, laadUpload,
+  updateCrop, bewaarBijgesneden, sluitBijsnijden,
+  openCam, knipFoto, opnieuwFoto, bewaarFoto, sluitCam,
+  openPrint, sluitPrint, doePrint, maakKaartjeAan,
+});
 </script>
 </body>
 </html>
