@@ -395,9 +395,17 @@ async function verwerkScan(){
   const sleutel=document.getElementById('scaninput').value.trim();
   document.getElementById('scaninput').value=''; document.getElementById('scaninput').focus();
   if(!sleutel) return;
+  await verwerkGescandeCode(sleutel, false);
+}
+
+// Gemeenschappelijke afhandeling van een gescande/ingetypte kaartje-code,
+// gebruikt door zowel het scanveld zelf als de globale scan-onderschepping
+// hieronder. toonMelding=true als de bediende ergens anders mee bezig was
+// (venster open of in een ander veld aan het typen) — dan tonen we een
+// opvallende banner in plaats van stilletjes de wachtkamer bij te werken.
+async function verwerkGescandeCode(code, toonMelding){
   try{
-    // Vraag de database om het kaartje te verwerken.
-    const res = await dbVerwerkScan(sleutel, HUIDIGE_MEDEWERKER_ID);
+    const res = await dbVerwerkScan(code, HUIDIGE_MEDEWERKER_ID);
     // res komt van fn_verwerk_scan: { checkin_id, lid_id, voornaam, achternaam,
     //   foto_pad, sociaal_tarief, resultaat, beurten_resterend, abonnement_geldig,
     //   abonnement_tot, moet_akaart, gevonden }  (eventueel verpakt door de RPC)
@@ -407,12 +415,86 @@ async function verwerkScan(){
       return;
     }
     piep();
+    if(toonMelding) toonScanMelding(r.voornaam+' '+r.achternaam);
     await verwerkEchteCheckin(r, 'check_in');
   }catch(e){
     console.error('Scan-fout:', e);
     toon('&#9888;&#65039; Probleem bij het scannen. Probeer opnieuw.');
   }
 }
+
+// Korte, opvallende melding bovenaan dat een scan herkend is (enkel getoond
+// als de bediende niet naar het scanveld aan het kijken was).
+function toonScanMelding(naam){
+  let bar=document.getElementById('scan-melding');
+  if(!bar){
+    bar=document.createElement('div'); bar.id='scan-melding';
+    bar.style.cssText='position:fixed;top:0;left:0;right:0;background:#1e8a4c;color:#fff;'
+      +'padding:12px 20px;text-align:center;font-size:17px;font-weight:600;z-index:100;'
+      +'display:flex;align-items:center;justify-content:center;gap:10px';
+    document.body.appendChild(bar);
+  }
+  bar.innerHTML='<span style="font-size:1.2em">&#9989;</span> Scan herkend: '+naam+' staat in de wachtkamer';
+  bar.style.display='flex';
+  clearTimeout(bar._t);
+  bar._t=setTimeout(()=>{bar.style.display='none';}, 2600);
+}
+
+// ===========================================================================
+// GLOBALE SCAN-ONDERSCHEPPING
+// Een USB-handscanner 'typt' de code zeer snel + Enter. We luisteren op het
+// hele document: komt er een snelle burst die met 'RY-' begint (zo ziet elk
+// echt kaartje-token eruit, zie fn_nieuw_kaartje), dan is het een scan -> we
+// verwerken ze rechtstreeks, ongeacht welk veld focus heeft of welk venster
+// openstaat. Typt een mens met de hand (trager), dan laten we alles gewoon
+// naar het actieve veld gaan. Dit is een vangnet: scannen werkt sowieso al
+// via het scanveld zelf, maar zo hoeft een medewerker niet eerst terug te
+// klikken als die net iets anders aan het doen was.
+// ===========================================================================
+const SCAN_PREFIX='RY-';
+const SCAN_MAX_PAUZE=60;   // ms tussen toetsen: sneller = scanner
+let scanBuffer='', scanLaatste=0, scanBezig=false;
+
+document.addEventListener('keydown', function(e){
+  const nu=Date.now();
+  const pauze=nu-scanLaatste;
+  scanLaatste=nu;
+
+  // Te lange pauze -> nieuwe (mogelijke) burst begint opnieuw.
+  if(pauze>SCAN_MAX_PAUZE){ scanBuffer=''; scanBezig=false; }
+
+  if(e.key==='Enter'){
+    // Sluit de burst enkel af als het op een geldige scan lijkt.
+    if(scanBezig && scanBuffer.startsWith(SCAN_PREFIX)){
+      e.preventDefault(); e.stopPropagation();
+      const code=scanBuffer; scanBuffer=''; scanBezig=false;
+      const actiefVeld = document.activeElement &&
+        (document.activeElement.tagName==='INPUT' || document.activeElement.tagName==='SELECT' ||
+         document.activeElement.tagName==='TEXTAREA') &&
+        document.activeElement.id!=='scaninput';
+      const vensterOpen = document.querySelector('.overlay.open')!==null;
+      verwerkGescandeCode(code, actiefVeld||vensterOpen);
+    } else {
+      scanBuffer=''; scanBezig=false;
+    }
+    return;
+  }
+
+  // Alleen 'gewone' tekens bufferen.
+  if(e.key.length===1){
+    scanBuffer+=e.key;
+    if(scanBuffer.length>=SCAN_PREFIX.length){
+      scanBezig = scanBuffer.startsWith(SCAN_PREFIX);
+    }
+    // Begint de buffer met 'RY-' en wordt er supersnel getypt, dan onderscheppen
+    // we de tekens zodat ze niet in het actieve veld terechtkomen.
+    if(scanBezig){
+      const actief=document.activeElement;
+      const isScanBalk = actief && actief.id==='scaninput';
+      if(!isScanBalk){ e.preventDefault(); e.stopPropagation(); }
+    }
+  }
+}, true);
 
 // Gemeenschappelijke afhandeling na een ECHTE check-in/info-aanvraag (scan,
 // "Klant opzoeken" of "Nieuw profiel"): gezinsleden + tegoed per activiteit
